@@ -108,7 +108,9 @@
     <button class="primary" id="reset">↺ Reset to favourites</button>
     <button id="mmode"></button>
     <button id="omode"></button>
+    <button id="hmode"></button>
     <button id="mc">🎲 Run 10,000 simulations</button>
+    <button id="share">🔗 Copy link</button>
     <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> to add a goal in their favour (click the score to reset)</span>
   </div>
   <div class="legend">
@@ -268,8 +270,14 @@ for(const n in RATING){
   if(ODDS[n]){ const p=100/(ODDS[n]+100); MKT[n]=Math.round(2084+120*Math.log(p)); }
   else MKT[n]=RATING[n];
 }
-// active strength source — flips between subjective ratings and the betting market
-function strength(team){ return oddsMode ? MKT[team] : RATING[team]; }
+// active strength source — flips between subjective ratings and the betting market,
+// plus an optional home-tournament boost for the three host nations.
+const HOSTS=new Set(["USA","Mexico","Canada"]);
+const HOST_BONUS=70;
+function strength(team){
+  const base = oddsMode ? MKT[team] : RATING[team];
+  return base + (hostBoost && HOSTS.has(team) ? HOST_BONUS : 0);
+}
 
 /* ============================================================
    STATE  (overrides)
@@ -278,6 +286,7 @@ let fxOverride = {};   // "A0" -> [homeGoals, awayGoals] manual scoreline
 let koOverride = {};   // matchNo -> winning team name
 let flatMargins = true; // true = every projected win defaults to 1–0; false = margin scales with rating gap
 let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
+let hostBoost = false;  // adds a home-tournament strength bump for USA / Mexico / Canada
 
 /* ============================================================
    SIMULATION
@@ -551,6 +560,9 @@ function render(){
     flatMargins ? "⚽ Scores: all 1–0" : "⚽ Scores: by strength";
   document.getElementById("omode").textContent =
     oddsMode ? "📈 Favourite: betting market" : "📊 Favourite: my ratings";
+  document.getElementById("hmode").textContent =
+    hostBoost ? "🏟️ Host boost: on" : "🏟️ Host boost: off";
+  history.replaceState(null, "", location.pathname + location.search + stateToHash());
 
   document.getElementById("champ").innerHTML = champ
     ? `<div class="lbl">Projected Champion</div><div class="team">${FLAG[champ]||""} ${champ}</div>`
@@ -628,6 +640,37 @@ document.getElementById("mc").onclick=()=>{
 document.getElementById("reset").onclick=()=>{ fxOverride={}; koOverride={}; render(); };
 document.getElementById("mmode").onclick=()=>{ flatMargins=!flatMargins; render(); };
 document.getElementById("omode").onclick=()=>{ oddsMode=!oddsMode; render(); };
+document.getElementById("hmode").onclick=()=>{ hostBoost=!hostBoost; render(); };
+document.getElementById("share").onclick=()=>{
+  const btn=document.getElementById("share");
+  navigator.clipboard.writeText(location.href).then(
+    ()=>{ btn.textContent="✓ Link copied"; setTimeout(()=>{btn.textContent="🔗 Copy link";},1500); },
+    ()=>{ btn.textContent="⚠ Copy failed"; setTimeout(()=>{btn.textContent="🔗 Copy link";},1500); }
+  );
+};
+
+// --- shareable state: encode modes + manual overrides into the URL hash ---
+function stateToHash(){
+  const s={};
+  if(!flatMargins) s.f=0;            // default is flat 1–0; store only when switched off
+  if(oddsMode) s.o=1;
+  if(hostBoost) s.h=1;
+  if(Object.keys(fxOverride).length) s.x=fxOverride;
+  if(Object.keys(koOverride).length) s.k=koOverride;
+  return Object.keys(s).length ? "#"+encodeURIComponent(JSON.stringify(s)) : "";
+}
+function applyHash(){
+  try{
+    const h=location.hash.replace(/^#/,"");
+    if(!h) return;
+    const s=JSON.parse(decodeURIComponent(h));
+    flatMargins = s.f!==0;
+    oddsMode = !!s.o;
+    hostBoost = !!s.h;
+    fxOverride = s.x || {};
+    koOverride = s.k || {};
+  }catch(e){ /* ignore a malformed hash */ }
+}
 
 document.getElementById("footnote").innerHTML =
   `<b>How it works.</b> Group tables are built from the <b>real played scorelines</b> (in <code>PLAYED</code>) as of 24 Jun 2026. `+
@@ -639,8 +682,10 @@ document.getElementById("footnote").innerHTML =
   `The eight best third‑placed teams are then slotted into the Round of 32 via FIFA's eligibility matrix (a valid constraint‑satisfying assignment; the official lookup may order ties differently). `+
   `The <b>“Favourite”</b> toggle chooses what decides every remaining group game and knockout tie: my subjective ratings, or the <b>betting market</b> `+
   `(outright title odds in <code>ODDS</code>, converted to implied probability and rescaled; unlisted longshots reuse their rating). In market mode the displayed number is that market strength. `+
-  `Ratings are approximate — edit the <code>GROUPS</code> or <code>ODDS</code> objects to change who's favoured. Click a team in any fixture for +1 goal, click a knockout match to flip it, or “Reset”.`;
+  `Ratings are approximate — edit the <code>GROUPS</code> or <code>ODDS</code> objects to change who's favoured. Click a team in any fixture for +1 goal, click a knockout match to flip it, or “Reset”. `+
+  `Use <b>🔗 Copy link</b> to share the exact scenario (modes + your overrides are saved in the URL); <b>🏟️ Host boost</b> adds a home‑tournament strength bump for the USA, Mexico and Canada.`;
 
+applyHash();
 render();
 </script>
 </body>
