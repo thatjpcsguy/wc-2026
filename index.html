@@ -44,6 +44,10 @@
   .pos.t{background:var(--amber);color:#1a1206}
   .pos.t.out{background:#39435c;color:#8595b8} .pos.x{background:transparent;color:#475068}
   .rt{color:var(--muted);font-size:11px}
+  .mcp{font-size:11px;color:var(--accent2)} .mcp.adv2{color:var(--accent);font-weight:600}
+  tr.dead .tn{text-decoration:line-through;color:var(--muted)}
+  tr.dead td{opacity:.6}
+  .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
   .h2h{font-size:8px;background:rgba(224,138,43,.22);color:var(--amber);padding:1px 4px;
     border-radius:3px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700}
   .fixtures{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
@@ -287,6 +291,7 @@ let koOverride = {};   // matchNo -> winning team name
 let flatMargins = true; // true = every projected win defaults to 1–0; false = margin scales with rating gap
 let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
 let hostBoost = false;  // adds a home-tournament strength bump for USA / Mexico / Canada
+let mcGroups = null;    // latest Monte Carlo results {tally,N}, shown as probabilities in the group tables
 
 /* ============================================================
    SIMULATION
@@ -372,6 +377,32 @@ function computeGroups(){
     tables[g]=rankStandings(t, played, false);
   }
   return tables;
+}
+
+// Mathematically eliminated = locked into 4th place (≥3 teams already have more points
+// than this team can ever reach), so it cannot finish top-2 or 3rd → can never advance.
+// "Decided" games = real results (PLAYED) plus any scoreline you've clicked in (fxOverride);
+// every still-open fixture is assumed winnable, so this is a true mathematical guarantee.
+function eliminatedTeams(){
+  const award=(pts,h,a,hg,ag)=>{ if(hg>ag)pts[h]+=3; else if(ag>hg)pts[a]+=3; else {pts[h]++;pts[a]++;} };
+  const dead=new Set();
+  for(const g in GROUPS){
+    const pts={}, open={};
+    for(const [n] of GROUPS[g]){ pts[n]=0; open[n]=0; }
+    PLAYED[g].forEach(([h,hg,ag,a])=>award(pts,h,a,hg,ag));
+    FIXTURES[g].forEach(([h,a],i)=>{
+      const k=g+i;
+      if(k in fxOverride){ const [hg,ag]=fxOverride[k]; award(pts,h,a,hg,ag); }
+      else { open[h]++; open[a]++; }
+    });
+    for(const [n] of GROUPS[g]){
+      const maxPts = pts[n] + 3*open[n];
+      let above=0;
+      for(const [o] of GROUPS[g]) if(o!==n && pts[o] > maxPts) above++;
+      if(above>=3) dead.add(n);
+    }
+  }
+  return dead;
 }
 
 function bestThirds(tables){
@@ -464,18 +495,19 @@ function simulateOnce(){
     let w=(!pa&&!pb)?null : !pa?pb : !pb?pa : (Math.random()<pWin(pa,pb)?pa:pb);
     return cache[m]=w;
   }
-  const ko32=[];
-  for(const g in gr){ ko32.push(gr[g].w, gr[g].ru); }
+  const ko32=[], winners=[];
+  for(const g in gr){ winners.push(gr[g].w); ko32.push(gr[g].w, gr[g].ru); }
   for(const m in assign){ ko32.push(gr[assign[m]].th); }
-  return { champ:win(104), fin:[win(101),win(102)], semis:[win(97),win(98),win(99),win(100)], ko32 };
+  return { champ:win(104), fin:[win(101),win(102)], semis:[win(97),win(98),win(99),win(100)], ko32, winners };
 }
 
 function runMonteCarlo(N){
   const tally={};
-  for(const n in RATING) tally[n]={ko:0,sf:0,f:0,t:0};
+  for(const n in RATING) tally[n]={wg:0,ko:0,sf:0,f:0,t:0};
   for(let i=0;i<N;i++){
     const r=simulateOnce();
-    r.ko32.forEach(n=>{ if(tally[n]) tally[n].ko++; });
+    r.winners.forEach(n=>{ if(tally[n]) tally[n].wg++; });   // won their group
+    r.ko32.forEach(n=>{ if(tally[n]) tally[n].ko++; });       // reached the knockouts (= advanced)
     r.semis.forEach(n=>{ if(n&&tally[n]) tally[n].sf++; });
     r.fin.forEach(n=>{ if(n&&tally[n]) tally[n].f++; });
     if(r.champ&&tally[r.champ]) tally[r.champ].t++;
@@ -494,6 +526,7 @@ function render(){
   // ----- groups -----
   const posCls=["w","r","t","x"];
   const posTxt=["1","2","3","4"];
+  const dead=eliminatedTeams();
   let gh="";
   for(const g of Object.keys(GROUPS)){
     const arr=tables[g];
@@ -501,9 +534,16 @@ function render(){
     arr.forEach((t,i)=>{
       const advanced = i<2 || (i===2 && qualSet.has(g));
       let badge = i<2 ? posCls[i] : i===2 ? (qualSet.has(g) ? "t" : "t out") : "x";
-      rows+=`<tr class="${advanced?'adv':''}">
-        <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} ${t.name}${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}</td>
-        <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td></tr>`;
+      let mcCells="";
+      if(mcGroups){
+        const m=mcGroups.tally[t.name]; const N=mcGroups.N;
+        const wg=100*m.wg/N, adv=100*m.ko/N;
+        mcCells=`<td class="mcp" title="Win group">${wg<1?'<1':Math.round(wg)}%</td><td class="mcp adv2" title="Advance to knockouts">${adv>99?'>99':adv<1?'<1':Math.round(adv)}%</td>`;
+      }
+      const isDead=dead.has(t.name);
+      rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}">
+        <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${isDead?'<span class="out" title="Mathematically eliminated — cannot finish in the top 3">OUT</span>':''}</td>
+        <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
     });
     let fx="";
     FIXTURES[g].forEach(([h,a],i)=>{
@@ -515,7 +555,7 @@ function render(){
         <span class="away ${hs<as?"wn a":""}" data-fx="${g+i}" data-dir="a" title="Click: +1 goal for ${a}">${a} ${FLAG[a]}</span></div>`;
     });
     gh+=`<div class="group"><h3>Group ${g}</h3>
-      <table><tr><th class="l">Team</th><th>Rtg</th><th>Pts</th><th>GD</th></tr>${rows}</table>
+      <table><tr><th class="l">Team</th><th>Rtg</th><th>Pts</th><th>GD</th>${mcGroups?'<th title="Win group">Win</th><th title="Advance to knockouts">Adv</th>':''}</tr>${rows}</table>
       <div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games (click a team for +1 goal)</div>${fx}</div>
     </div>`;
   }
@@ -586,6 +626,7 @@ function attachEvents(){
       const id=el.dataset.fx, dir=el.dataset.dir;
       const g=id.slice(0,1), i=+id.slice(1);
       const [h,a]=FIXTURES[g][i];
+      mcGroups=null;                                              // scenario changed → drop stale sim probabilities
       if(dir==="r"){ delete fxOverride[id]; render(); return; }   // reset to projected score
       let [gh,ga]=(id in fxOverride)?fxOverride[id]:strengthScore(h,a);
       if(dir==="h") gh=Math.min(gh+1,15); else ga=Math.min(ga+1,15);  // the clicked team scores
@@ -594,14 +635,14 @@ function attachEvents(){
     };
   });
   document.querySelectorAll("[data-ko]").forEach(el=>{
-    el.onclick=()=>{ koOverride[+el.dataset.ko]=el.dataset.team; render(); };
+    el.onclick=()=>{ mcGroups=null; koOverride[+el.dataset.ko]=el.dataset.team; render(); };
   });
 }
 
 function renderMC(res){
   const {tally,N}=res;
-  const teams=Object.keys(tally).sort((a,b)=> tally[b].t-tally[a].t || tally[b].f-tally[a].f || tally[b].sf-tally[a].sf);
-  const top=teams.slice(0,20);
+  const dead=eliminatedTeams();
+  const top=Object.keys(tally).filter(n=>!dead.has(n)).sort((a,b)=> tally[b].t-tally[a].t || tally[b].f-tally[a].f || tally[b].sf-tally[a].sf || tally[b].ko-tally[a].ko);
   const pct=c=>100*c/N;
   const maxT=Math.max(1,...top.map(n=>tally[n].t));
   let rows="";
@@ -634,13 +675,13 @@ function renderMC(res){
 document.getElementById("mc").onclick=()=>{
   const btn=document.getElementById("mc");
   btn.textContent="Running…"; btn.disabled=true;
-  setTimeout(()=>{ renderMC(runMonteCarlo(10000)); btn.textContent="🎲 Run 10,000 simulations"; btn.disabled=false; }, 30);
+  setTimeout(()=>{ const res=runMonteCarlo(10000); mcGroups=res; render(); renderMC(res); btn.textContent="🎲 Run 10,000 simulations"; btn.disabled=false; }, 30);
 };
 
-document.getElementById("reset").onclick=()=>{ fxOverride={}; koOverride={}; render(); };
-document.getElementById("mmode").onclick=()=>{ flatMargins=!flatMargins; render(); };
-document.getElementById("omode").onclick=()=>{ oddsMode=!oddsMode; render(); };
-document.getElementById("hmode").onclick=()=>{ hostBoost=!hostBoost; render(); };
+document.getElementById("reset").onclick=()=>{ mcGroups=null; fxOverride={}; koOverride={}; render(); };
+document.getElementById("mmode").onclick=()=>{ mcGroups=null; flatMargins=!flatMargins; render(); };
+document.getElementById("omode").onclick=()=>{ mcGroups=null; oddsMode=!oddsMode; render(); };
+document.getElementById("hmode").onclick=()=>{ mcGroups=null; hostBoost=!hostBoost; render(); };
 document.getElementById("share").onclick=()=>{
   const btn=document.getElementById("share");
   navigator.clipboard.writeText(location.href).then(
@@ -649,27 +690,32 @@ document.getElementById("share").onclick=()=>{
   );
 };
 
-// --- shareable state: encode modes + manual overrides into the URL hash ---
+// --- shareable state: encode modes + manual overrides into a readable URL hash ---
+// e.g.  #market&host&strength&A0=2-1&ko97=England
 function stateToHash(){
-  const s={};
-  if(!flatMargins) s.f=0;            // default is flat 1–0; store only when switched off
-  if(oddsMode) s.o=1;
-  if(hostBoost) s.h=1;
-  if(Object.keys(fxOverride).length) s.x=fxOverride;
-  if(Object.keys(koOverride).length) s.k=koOverride;
-  return Object.keys(s).length ? "#"+encodeURIComponent(JSON.stringify(s)) : "";
+  const t=[];
+  if(!flatMargins) t.push("strength");                 // default is flat 1–0
+  if(oddsMode) t.push("market");
+  if(hostBoost) t.push("host");
+  for(const id in fxOverride){ const [h,a]=fxOverride[id]; t.push(`${id}=${h}-${a}`); }
+  for(const m in koOverride){ t.push(`ko${m}=${koOverride[m].replace(/ /g,"_")}`); }
+  return t.length ? "#"+t.join("&") : "";
 }
 function applyHash(){
-  try{
-    const h=location.hash.replace(/^#/,"");
-    if(!h) return;
-    const s=JSON.parse(decodeURIComponent(h));
-    flatMargins = s.f!==0;
-    oddsMode = !!s.o;
-    hostBoost = !!s.h;
-    fxOverride = s.x || {};
-    koOverride = s.k || {};
-  }catch(e){ /* ignore a malformed hash */ }
+  const h=location.hash.replace(/^#/,"");
+  if(!h) return;
+  flatMargins=true; oddsMode=false; hostBoost=false; fxOverride={}; koOverride={};
+  for(let tok of h.split("&")){
+    try{ tok=decodeURIComponent(tok); }catch(e){}
+    if(tok==="strength") flatMargins=false;
+    else if(tok==="market") oddsMode=true;
+    else if(tok==="host") hostBoost=true;
+    else{
+      let m;
+      if(m=tok.match(/^([A-L]\d+)=(\d+)-(\d+)$/)) fxOverride[m[1]]=[+m[2],+m[3]];
+      else if(m=tok.match(/^ko(\d+)=(.+)$/)) koOverride[+m[1]]=m[2].replace(/_/g," ");
+    }
+  }
 }
 
 document.getElementById("footnote").innerHTML =
@@ -685,6 +731,7 @@ document.getElementById("footnote").innerHTML =
   `Ratings are approximate — edit the <code>GROUPS</code> or <code>ODDS</code> objects to change who's favoured. Click a team in any fixture for +1 goal, click a knockout match to flip it, or “Reset”. `+
   `Use <b>🔗 Copy link</b> to share the exact scenario (modes + your overrides are saved in the URL); <b>🏟️ Host boost</b> adds a home‑tournament strength bump for the USA, Mexico and Canada.`;
 
+window.addEventListener("hashchange", ()=>{ mcGroups=null; applyHash(); render(); });
 applyHash();
 render();
 </script>
