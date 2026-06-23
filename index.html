@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Favourites Simulator</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#121a2e; --panel2:#0f1626; --line:#243049;
+    --txt:#e8eefc; --muted:#8595b8; --accent:#19c37d; --accent2:#3b82f6;
+    --gold:#f5c451; --amber:#e08a2b; --red:#e0533b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#0a0e1a,#0d1426);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
+  header{padding:22px 26px 14px;border-bottom:1px solid var(--line);
+    background:linear-gradient(90deg,#0e1730,#101a33)}
+  h1{margin:0;font-size:22px;letter-spacing:.3px}
+  h1 .em{color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+  button{background:var(--panel);color:var(--txt);border:1px solid var(--line);
+    padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.primary{background:var(--accent);color:#04240f;border-color:var(--accent);font-weight:600}
+  .hint{color:var(--muted);font-size:12px}
+  main{padding:20px 26px 60px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
+    margin:30px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+
+  /* Groups */
+  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+  .group{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+  .group h3{margin:0 0 8px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  .group h3 span{color:var(--muted);font-weight:400;font-size:11px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;text-align:right;padding:2px 4px}
+  th.l,td.l{text-align:left}
+  td{padding:4px 4px;border-top:1px solid var(--panel2);text-align:right}
+  tr.adv td{font-weight:600}
+  .pos{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;
+    border-radius:4px;font-size:10px;margin-right:7px;font-weight:700;color:#04240f}
+  .pos.w{background:var(--accent)} .pos.r{background:var(--accent2);color:#fff}
+  .pos.t{background:var(--amber);color:#1a1206}
+  .pos.t.out{background:#39435c;color:#8595b8} .pos.x{background:transparent;color:#475068}
+  .rt{color:var(--muted);font-size:11px}
+  .h2h{font-size:8px;background:rgba(224,138,43,.22);color:var(--amber);padding:1px 4px;
+    border-radius:3px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700}
+  .fixtures{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
+  .fixtures .fx{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;
+    font-size:12px;padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--muted)}
+  .fixtures .fx:hover{background:var(--panel2)}
+  .fixtures .fx .home{text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .fixtures .fx .away{text-align:right;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .fixtures .fx .wn{font-weight:700;color:#fff}
+  .fixtures .fx .wn.h{color:var(--accent)} .fixtures .fx .wn.a{color:var(--accent2)}
+  .fixtures .score{font-weight:700;font-size:11px;padding:1px 7px;border-radius:4px;background:var(--panel2);color:var(--muted)}
+  .fixtures .score.h{color:var(--accent)} .fixtures .score.a{color:var(--accent2)} .fixtures .score.d{color:var(--gold)}
+
+  /* Third-place table */
+  .thirds{width:100%;max-width:660px;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .thirds th{padding:9px 12px;text-align:right;font-size:10px}
+  .thirds th.l,.thirds td.l{text-align:left}
+  .thirds td{padding:7px 12px;text-align:right;border-top:1px solid var(--panel2);font-size:13px}
+  .thirds tr.q td{background:rgba(25,195,125,.07)}
+  .thirds tr.q td.st{color:var(--accent);font-weight:600}
+  .thirds tr.o td{color:var(--muted)}
+  .thirds tr.cut td{text-align:center;color:var(--amber);font-size:10px;letter-spacing:1.5px;padding:5px;
+    background:repeating-linear-gradient(90deg,transparent,transparent 7px,rgba(224,138,43,.14) 7px,rgba(224,138,43,.14) 14px)}
+  .thirds .rk{color:var(--muted)}
+  .pbar{display:inline-block;height:9px;border-radius:2px;background:var(--accent2);margin-right:7px;vertical-align:middle;min-width:2px}
+
+  /* Bracket */
+  .bracket{display:flex;gap:18px;overflow-x:auto;padding-bottom:14px}
+  .round{flex:0 0 auto;width:210px;display:flex;flex-direction:column;gap:10px;justify-content:space-around}
+  .round h4{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center}
+  .tie{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:12.5px}
+  .tie.path{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+  .tie .mno{font-size:9px;color:#475068;padding:2px 8px 0}
+  .slot .rgt{display:flex;align-items:center;gap:7px}
+  .wp{font-size:9px;color:var(--accent);font-weight:600}
+  .slot{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;cursor:pointer;
+    border-top:1px solid var(--panel2)}
+  .slot:first-of-type{border-top:none}
+  .slot:hover{background:var(--panel2)}
+  .slot.win{background:rgba(25,195,125,.13)}
+  .slot.win .nm{color:#fff;font-weight:700}
+  .slot .nm{display:flex;align-items:center;gap:7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .slot .rt{font-size:10px}
+  .slot.empty{font-style:italic;color:#475068;cursor:default}
+  .flag{font-size:14px}
+  .champ{margin-top:16px;text-align:center;background:linear-gradient(90deg,#241d04,#3a2f06);
+    border:1px solid var(--gold);border-radius:12px;padding:18px}
+  .champ .lbl{color:var(--gold);text-transform:uppercase;letter-spacing:2px;font-size:12px}
+  .champ .team{font-size:30px;font-weight:800;margin-top:6px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 0}
+  .legend b{color:var(--txt);font-weight:600}
+  .note{font-size:12px;color:var(--muted);max-width:900px;margin-top:8px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏆 FIFA World Cup 2026 — <span class="em">Favourites Simulator</span></h1>
+  <div class="sub">Built from the real played scorelines as of 24 June 2026. Every remaining match is resolved by team strength — the favourite wins each tie. Click any match to override the result and watch the bracket recompute.</div>
+  <div class="controls">
+    <button class="primary" id="reset">↺ Reset to favourites</button>
+    <button id="mmode"></button>
+    <button id="omode"></button>
+    <button id="mc">🎲 Run 10,000 simulations</button>
+    <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> to add a goal in their favour (click the score to reset)</span>
+  </div>
+  <div class="legend">
+    <span><span class="pos w" style="vertical-align:middle"> </span><b>Group winner</b></span>
+    <span><span class="pos r" style="vertical-align:middle"> </span><b>Runner‑up</b></span>
+    <span><span class="pos t" style="vertical-align:middle"> </span><b>3rd — qualifies</b></span>
+    <span><span class="pos t out" style="vertical-align:middle"> </span><b>3rd — eliminated</b></span>
+    <span>Number after a team = <b>strength</b> (my rating, or market‑implied when betting mode is on). Higher = favourite.</span>
+  </div>
+</header>
+<main>
+  <h2>Group Stage — projected final tables</h2>
+  <div class="groups" id="groups"></div>
+
+  <h2>Best Third‑Placed Teams — 8 of 12 qualify</h2>
+  <div id="thirds"></div>
+
+  <h2>Monte Carlo — title &amp; round probabilities</h2>
+  <div id="mcout"><div class="hint">Runs thousands of randomised tournaments (real results kept fixed; remaining games by the expected‑goals model; knockouts by win probability) using the <b>currently selected favourite source</b>. Click <b>Run 10,000 simulations</b> above.</div></div>
+
+  <h2>Knockout Bracket — Round of 32 → Final</h2>
+  <div class="bracket" id="bracket"></div>
+  <div class="champ" id="champ"></div>
+
+  <div class="note" id="footnote"></div>
+</main>
+
+<script>
+/* ============================================================
+   DATA
+   teams: rating ≈ FIFA-style strength (higher = favourite)
+          pts/gd = real standings after Matchday 2 (23 Jun 2026)
+   ============================================================ */
+const FLAG = {
+ Mexico:"🇲🇽","South Korea":"🇰🇷",Czechia:"🇨🇿","South Africa":"🇿🇦",
+ Canada:"🇨🇦",Switzerland:"🇨🇭",Bosnia:"🇧🇦",Qatar:"🇶🇦",
+ Brazil:"🇧🇷",Morocco:"🇲🇦",Scotland:"🏴󠁧󠁢󠁳󠁣󠁴󠁿",Haiti:"🇭🇹",
+ USA:"🇺🇸",Australia:"🇦🇺",Paraguay:"🇵🇾","Türkiye":"🇹🇷",
+ Germany:"🇩🇪","Ivory Coast":"🇨🇮",Ecuador:"🇪🇨","Curaçao":"🇨🇼",
+ Netherlands:"🇳🇱",Japan:"🇯🇵",Sweden:"🇸🇪",Tunisia:"🇹🇳",
+ Belgium:"🇧🇪",Egypt:"🇪🇬",Iran:"🇮🇷","New Zealand":"🇳🇿",
+ Spain:"🇪🇸",Uruguay:"🇺🇾","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦",
+ France:"🇫🇷",Norway:"🇳🇴",Senegal:"🇸🇳",Iraq:"🇮🇶",
+ Argentina:"🇦🇷",Austria:"🇦🇹",Jordan:"🇯🇴",Algeria:"🇩🇿",
+ Colombia:"🇨🇴","DR Congo":"🇨🇩",Portugal:"🇵🇹",Uzbekistan:"🇺🇿",
+ England:"🏴󠁧󠁢󠁥󠁮󠁧󠁿",Croatia:"🇭🇷",Ghana:"🇬🇭",Panama:"🇵🇦"
+};
+
+// group -> [ [name, rating] ]  (rating ≈ FIFA-style strength; higher = favourite)
+const GROUPS = {
+ A:[["Mexico",1655],["South Korea",1565],["Czechia",1500],["South Africa",1450]],
+ B:[["Canada",1520],["Switzerland",1650],["Bosnia",1500],["Qatar",1440]],
+ C:[["Brazil",1780],["Morocco",1710],["Scotland",1500],["Haiti",1290]],
+ D:[["USA",1665],["Australia",1525],["Paraguay",1490],["Türkiye",1565]],
+ E:[["Germany",1740],["Ivory Coast",1545],["Ecuador",1575],["Curaçao",1280]],
+ F:[["Netherlands",1755],["Japan",1650],["Sweden",1560],["Tunisia",1485]],
+ G:[["Belgium",1745],["Egypt",1510],["Iran",1630],["New Zealand",1300]],
+ H:[["Spain",1875],["Uruguay",1680],["Cape Verde",1390],["Saudi Arabia",1455]],
+ I:[["France",1865],["Norway",1600],["Senegal",1645],["Iraq",1390]],
+ J:[["Argentina",1880],["Austria",1580],["Jordan",1390],["Algeria",1505]],
+ K:[["Colombia",1690],["DR Congo",1470],["Portugal",1770],["Uzbekistan",1430]],
+ L:[["England",1825],["Croatia",1705],["Ghana",1505],["Panama",1490]]
+};
+
+// Actual played results (real scorelines from the tournament, as of 23 Jun 2026): [home, homeGoals, awayGoals, away]
+const PLAYED = {
+ A:[["Mexico",2,0,"South Africa"],["South Korea",2,1,"Czechia"],["Czechia",1,1,"South Africa"],["Mexico",1,0,"South Korea"]],
+ B:[["Canada",1,1,"Bosnia"],["Qatar",1,1,"Switzerland"],["Switzerland",4,1,"Bosnia"],["Canada",6,0,"Qatar"]],
+ C:[["Brazil",1,1,"Morocco"],["Haiti",0,1,"Scotland"],["Scotland",0,1,"Morocco"],["Brazil",3,0,"Haiti"]],
+ D:[["USA",4,1,"Paraguay"],["Australia",2,0,"Türkiye"],["USA",2,0,"Australia"],["Türkiye",0,1,"Paraguay"]],
+ E:[["Germany",7,1,"Curaçao"],["Ivory Coast",1,0,"Ecuador"],["Germany",2,1,"Ivory Coast"],["Ecuador",0,0,"Curaçao"]],
+ F:[["Netherlands",2,2,"Japan"],["Sweden",5,1,"Tunisia"],["Netherlands",5,1,"Sweden"],["Tunisia",0,4,"Japan"]],
+ G:[["Belgium",1,1,"Egypt"],["Iran",2,2,"New Zealand"],["Belgium",0,0,"Iran"],["New Zealand",1,3,"Egypt"]],
+ H:[["Spain",0,0,"Cape Verde"],["Saudi Arabia",1,1,"Uruguay"],["Spain",4,0,"Saudi Arabia"],["Uruguay",2,2,"Cape Verde"]],
+ I:[["France",3,1,"Senegal"],["Iraq",1,4,"Norway"],["France",3,0,"Iraq"],["Norway",3,2,"Senegal"]],
+ J:[["Argentina",3,0,"Algeria"],["Austria",3,1,"Jordan"],["Argentina",2,0,"Austria"],["Jordan",1,2,"Algeria"]],
+ K:[["Portugal",1,1,"DR Congo"],["Uzbekistan",1,3,"Colombia"],["Portugal",5,0,"Uzbekistan"]],
+ L:[["England",4,2,"Croatia"],["Ghana",1,0,"Panama"],["England",0,0,"Ghana"]]
+};
+
+// Outright "to win the tournament" odds (American), market consensus as of 24 Jun 2026 (FOX Sports / VegasInsider).
+// Teams not listed are deep longshots and fall back to their strength rating in market mode.
+const ODDS = {
+ France:400, Spain:500, England:600, Argentina:650, Portugal:1000, Brazil:1200,
+ Germany:1300, Netherlands:1600, Norway:3300, USA:3300, Morocco:3500, Japan:4000,
+ Mexico:4500, Belgium:5000, Colombia:5000, Switzerland:8000
+};
+
+// Remaining Matchday-3 fixtures (home vs away), per ESPN schedule
+const FIXTURES = {
+ A:[["Czechia","Mexico"],["South Africa","South Korea"]],
+ B:[["Switzerland","Canada"],["Bosnia","Qatar"]],
+ C:[["Scotland","Brazil"],["Morocco","Haiti"]],
+ D:[["Türkiye","USA"],["Paraguay","Australia"]],
+ E:[["Ecuador","Germany"],["Curaçao","Ivory Coast"]],
+ F:[["Japan","Sweden"],["Tunisia","Netherlands"]],
+ G:[["Egypt","Iran"],["New Zealand","Belgium"]],
+ H:[["Cape Verde","Saudi Arabia"],["Uruguay","Spain"]],
+ I:[["Norway","France"],["Senegal","Iraq"]],
+ J:[["Algeria","Austria"],["Jordan","Argentina"]],
+ // Groups K & L are a matchday behind; each now has three fixtures left (one MD2 game + both MD3 games).
+ K:[["Colombia","DR Congo"],["Colombia","Portugal"],["Uzbekistan","DR Congo"]],
+ L:[["Panama","Croatia"],["England","Panama"],["Croatia","Ghana"]]
+};
+
+// Round of 32 — official 2026 bracket. w=group winner, ru=runner-up, th=3rd assigned to that match slot
+// Later rounds reference winner of a prior match: {win:N}
+const KO = {
+ 73:{a:{ru:"A"},b:{ru:"B"}},
+ 74:{a:{w:"E"}, b:{th:74}},
+ 75:{a:{w:"F"}, b:{ru:"C"}},
+ 76:{a:{w:"C"}, b:{ru:"F"}},
+ 77:{a:{w:"I"}, b:{th:77}},
+ 78:{a:{ru:"E"},b:{ru:"I"}},
+ 79:{a:{w:"A"}, b:{th:79}},
+ 80:{a:{w:"L"}, b:{th:80}},
+ 81:{a:{w:"D"}, b:{th:81}},
+ 82:{a:{w:"G"}, b:{th:82}},
+ 83:{a:{ru:"K"},b:{ru:"L"}},
+ 84:{a:{w:"H"}, b:{ru:"J"}},
+ 85:{a:{w:"B"}, b:{th:85}},
+ 86:{a:{w:"J"}, b:{ru:"H"}},
+ 87:{a:{w:"K"}, b:{th:87}},
+ 88:{a:{ru:"D"},b:{ru:"G"}},
+ 89:{a:{win:74},b:{win:77}}, 90:{a:{win:73},b:{win:75}},
+ 91:{a:{win:76},b:{win:78}}, 92:{a:{win:79},b:{win:80}},
+ 93:{a:{win:83},b:{win:84}}, 94:{a:{win:81},b:{win:82}},
+ 95:{a:{win:86},b:{win:88}}, 96:{a:{win:85},b:{win:87}},
+ 97:{a:{win:89},b:{win:90}}, 98:{a:{win:93},b:{win:94}},
+ 99:{a:{win:91},b:{win:92}},100:{a:{win:95},b:{win:96}},
+ 101:{a:{win:97},b:{win:98}},102:{a:{win:99},b:{win:100}},
+ 104:{a:{win:101},b:{win:102}}
+};
+const ROUNDS = [
+ {name:"Round of 32", ms:[74,77,73,75,76,78,79,80,83,84,81,82,86,88,85,87]},
+ {name:"Round of 16", ms:[89,90,91,92,93,94,95,96]},
+ {name:"Quarter‑finals", ms:[97,99,98,100]},
+ {name:"Semi‑finals", ms:[101,102]},
+ {name:"Final", ms:[104]}
+];
+// 3rd-place slots and which groups are eligible for each (official allocation matrix)
+const THIRD_SLOTS = [
+ {m:74,e:["A","B","C","D","F"]},{m:77,e:["C","D","F","G","H"]},
+ {m:79,e:["C","E","F","H","I"]},{m:80,e:["E","H","I","J","K"]},
+ {m:81,e:["B","E","F","I","J"]},{m:82,e:["A","E","H","I","J"]},
+ {m:85,e:["E","F","G","I","J"]},{m:87,e:["D","E","I","J","L"]}
+];
+
+/* lookups */
+const RATING={}, GRP={};
+for(const g in GROUPS) for(const [n,r] of GROUPS[g]){ RATING[n]=r; GRP[n]=g; }
+
+// Market rating: title odds → implied probability → a rating on the SAME scale as RATING
+// (calibrated so the shortest price lands near the top of the rating band). Unlisted teams reuse their rating.
+const MKT={};
+for(const n in RATING){
+  if(ODDS[n]){ const p=100/(ODDS[n]+100); MKT[n]=Math.round(2084+120*Math.log(p)); }
+  else MKT[n]=RATING[n];
+}
+// active strength source — flips between subjective ratings and the betting market
+function strength(team){ return oddsMode ? MKT[team] : RATING[team]; }
+
+/* ============================================================
+   STATE  (overrides)
+   ============================================================ */
+let fxOverride = {};   // "A0" -> [homeGoals, awayGoals] manual scoreline
+let koOverride = {};   // matchNo -> winning team name
+let flatMargins = true; // true = every projected win defaults to 1–0; false = margin scales with rating gap
+let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
+
+/* ============================================================
+   SIMULATION
+   ============================================================ */
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+
+// --- Grounded goal model: expected goals from the rating gap ---------------
+// Poisson / Elo-"supremacy" model used in football forecasting (e.g. SPI, Dixon–Coles):
+// the rating gap → an expected goal supremacy, split around the real WC average (~2.6 goals/game).
+// Calibration: ~1 goal of supremacy per 250 rating points.
+function lambdas(h,a){
+  const s=(strength(h)-strength(a))/250;          // expected goal difference (home − away)
+  return [Math.max(0.18, 1.30 + s/2), Math.max(0.18, 1.30 - s/2)];
+}
+// win probability for a single knockout match (logistic on the rating gap)
+function pWin(a,b){ return 1/(1+Math.pow(10,(strength(b)-strength(a))/350)); }
+// Poisson sampler (Knuth) — for the Monte Carlo mode
+function poisson(l){ const L=Math.exp(-l); let k=0,p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; }
+function sampleScore(h,a){ const [lh,la]=lambdas(h,a); return [poisson(lh),poisson(la)]; }
+
+// Deterministic "most likely" scoreline for the default projection (favourite wins each tie).
+//  flatMargins → every win is a minimal 1–0; otherwise round the expected goals, with the
+//  favourite nudged to win if the rounding produced a draw.
+function strengthScore(h,a){
+  if(flatMargins) return strength(h)>=strength(a) ? [1,0] : [0,1];
+  const [lh,la]=lambdas(h,a);
+  let gh=Math.round(lh), ga=Math.round(la);
+  if(strength(h)>=strength(a)){ if(gh<=ga) gh=ga+1; } else { if(ga<=gh) ga=gh+1; }
+  return [gh,ga];
+}
+// active scoreline for a remaining fixture: a manual [home,away] override, or the projection
+function fxScore(g,i,h,a){ const k=g+i; return (k in fxOverride)?fxOverride[k]:strengthScore(h,a); }
+
+function applyMatch(t,played,h,a,hg,ag){
+  t[h].gf+=hg; t[a].gf+=ag; t[h].gd+=(hg-ag); t[a].gd+=(ag-hg);
+  if(hg>ag) t[h].pts+=3; else if(ag>hg) t[a].pts+=3; else { t[h].pts++; t[a].pts++; }
+  played.push({h,a,hg,ag});
+}
+
+// 2026 FIFA tiebreak order: points → head-to-head (pts → GD → goals among the tied teams)
+// → overall GD → overall goals → rating. `jitter` adds a random final tiebreak (Monte Carlo).
+function rankStandings(t, played, jitter){
+  const arr=Object.values(t).sort((x,y)=> y.pts-x.pts);
+  let i0=0;
+  while(i0<arr.length){
+    let j=i0+1;
+    while(j<arr.length && arr[j].pts===arr[i0].pts) j++;
+    if(j-i0>1){                            // teams level on points → head-to-head FIRST
+      const run=arr.slice(i0,j);
+      const names=new Set(run.map(r=>r.name));
+      const hp={}, hgd={}, hgf={};
+      run.forEach(r=>{hp[r.name]=0;hgd[r.name]=0;hgf[r.name]=0;});
+      played.forEach(({h,a,hg,ag})=>{
+        if(names.has(h)&&names.has(a)){
+          hgf[h]+=hg; hgf[a]+=ag; hgd[h]+=(hg-ag); hgd[a]+=(ag-hg);
+          if(hg>ag) hp[h]+=3; else if(ag>hg) hp[a]+=3; else { hp[h]++; hp[a]++; }
+        }
+      });
+      run.sort((x,y)=> hp[y.name]-hp[x.name] || hgd[y.name]-hgd[x.name] || hgf[y.name]-hgf[x.name]
+                       || y.gd-x.gd || y.gf-x.gf || y.r-x.r || (jitter?(Math.random()-0.5):0));
+      for(let k=0;k<run.length-1;k++){     // tag places head-to-head (not overall GD) actually decided
+        const x=run[k], y=run[k+1];
+        if(hp[x.name]!==hp[y.name] || hgd[x.name]!==hgd[y.name] || hgf[x.name]!==hgf[y.name]){ x.h2h=true; y.h2h=true; }
+      }
+      for(let k=0;k<run.length;k++) arr[i0+k]=run[k];
+    }
+    i0=j;
+  }
+  return arr;
+}
+
+function computeGroups(){
+  const tables={};
+  for(const g in GROUPS){
+    const t={};
+    for(const [n,r] of GROUPS[g]) t[n]={name:n,r:strength(n),pts:0,gd:0,gf:0,h2h:false};
+    const played=[];
+    PLAYED[g].forEach(([h,hg,ag,a])=> applyMatch(t,played,h,a,hg,ag));   // real results
+    FIXTURES[g].forEach(([h,a],i)=>{                                     // simulated remaining games
+      const [gh,ga]=fxScore(g,i,h,a);
+      applyMatch(t,played,h,a,gh,ga);
+    });
+    tables[g]=rankStandings(t, played, false);
+  }
+  return tables;
+}
+
+function bestThirds(tables){
+  const thirds = Object.keys(tables).map(g=>({g, ...tables[g][2]}));
+  thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || y.r-x.r);
+  const qualGroups = thirds.slice(0,8).map(t=>t.g);
+  const qualSet = new Set(qualGroups);
+  // constraint matching: assign each 3rd-place slot a distinct eligible qualifying group
+  const assign={}; const used=new Set();
+  // order qualifying groups by strength so stronger 3rds tend to fill first
+  const ordered = qualGroups.slice().sort((a,b)=> tables[b][2].r - tables[a][2].r);
+  (function bt(i){
+    if(i===THIRD_SLOTS.length) return true;
+    for(const g of ordered){
+      if(!used.has(g) && THIRD_SLOTS[i].e.includes(g)){
+        used.add(g); assign[THIRD_SLOTS[i].m]=g;
+        if(bt(i+1)) return true;
+        used.delete(g);
+      }
+    }
+    return false;
+  })(0);
+  return {assign, qualSet, ranked:thirds};
+}
+
+function buildResolver(tables, thirdAssign){
+  const memo={};
+  function ref(o){
+    if(o.w!==undefined)  return tables[o.w][0].name;
+    if(o.ru!==undefined) return tables[o.ru][1].name;
+    if(o.th!==undefined){ const g=thirdAssign[o.th]; return g?tables[g][2].name:null; }
+    if(o.win!==undefined)return winner(o.win);
+  }
+  function winner(m){
+    if(memo[m]!==undefined) return memo[m];
+    const M=KO[m]; const pa=ref(M.a), pb=ref(M.b);
+    let w;
+    if(!pa&&!pb) w=null;
+    else if(!pa) w=pb;
+    else if(!pb) w=pa;
+    else{
+      const ov=koOverride[m];
+      w = (ov===pa||ov===pb) ? ov : (strength(pa)>=strength(pb)?pa:pb);
+    }
+    return memo[m]=w;
+  }
+  return {participants:m=>[ref(KO[m].a),ref(KO[m].b)], winner};
+}
+
+/* ============================================================
+   MONTE CARLO  — probabilistic re-runs of the whole remaining tournament
+   ============================================================ */
+// assign the 8 qualifying 3rd-place groups to R32 slots respecting FIFA's eligibility matrix
+function assignThirds(qualGroups){
+  const assign={}, used=new Set();
+  (function bt(i){
+    if(i===THIRD_SLOTS.length) return true;
+    for(const g of qualGroups){
+      if(!used.has(g) && THIRD_SLOTS[i].e.includes(g)){
+        used.add(g); assign[THIRD_SLOTS[i].m]=g;
+        if(bt(i+1)) return true;
+        used.delete(g);
+      }
+    }
+    return false;
+  })(0);
+  return assign;
+}
+
+// one randomised tournament: real results fixed, remaining games via Poisson, knockouts via pWin
+function simulateOnce(){
+  const gr={}, thirds=[];
+  for(const g in GROUPS){
+    const t={}; for(const [n] of GROUPS[g]) t[n]={name:n,r:strength(n),pts:0,gd:0,gf:0,h2h:false};
+    const played=[];
+    PLAYED[g].forEach(([h,hg,ag,a])=> applyMatch(t,played,h,a,hg,ag));
+    FIXTURES[g].forEach(([h,a])=>{ const [hg,ag]=sampleScore(h,a); applyMatch(t,played,h,a,hg,ag); });
+    const arr=rankStandings(t,played,true);
+    gr[g]={w:arr[0].name, ru:arr[1].name, th:arr[2].name};
+    thirds.push({g,pts:arr[2].pts,gd:arr[2].gd,gf:arr[2].gf});
+  }
+  thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || (Math.random()-0.5));
+  const assign=assignThirds(thirds.slice(0,8).map(x=>x.g));
+  const cache={};
+  const ref=(o)=> o.w!==undefined?gr[o.w].w : o.ru!==undefined?gr[o.ru].ru
+                : o.th!==undefined?(assign[o.th]?gr[assign[o.th]].th:null) : win(o.win);
+  function win(m){
+    if(cache[m]!==undefined) return cache[m];
+    const M=KO[m], pa=ref(M.a), pb=ref(M.b);
+    let w=(!pa&&!pb)?null : !pa?pb : !pb?pa : (Math.random()<pWin(pa,pb)?pa:pb);
+    return cache[m]=w;
+  }
+  const ko32=[];
+  for(const g in gr){ ko32.push(gr[g].w, gr[g].ru); }
+  for(const m in assign){ ko32.push(gr[assign[m]].th); }
+  return { champ:win(104), fin:[win(101),win(102)], semis:[win(97),win(98),win(99),win(100)], ko32 };
+}
+
+function runMonteCarlo(N){
+  const tally={};
+  for(const n in RATING) tally[n]={ko:0,sf:0,f:0,t:0};
+  for(let i=0;i<N;i++){
+    const r=simulateOnce();
+    r.ko32.forEach(n=>{ if(tally[n]) tally[n].ko++; });
+    r.semis.forEach(n=>{ if(n&&tally[n]) tally[n].sf++; });
+    r.fin.forEach(n=>{ if(n&&tally[n]) tally[n].f++; });
+    if(r.champ&&tally[r.champ]) tally[r.champ].t++;
+  }
+  return {tally, N};
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const tables=computeGroups();
+  const {assign:thirdAssign, qualSet, ranked}=bestThirds(tables);
+  const R=buildResolver(tables, thirdAssign);
+
+  // ----- groups -----
+  const posCls=["w","r","t","x"];
+  const posTxt=["1","2","3","4"];
+  let gh="";
+  for(const g of Object.keys(GROUPS)){
+    const arr=tables[g];
+    let rows="";
+    arr.forEach((t,i)=>{
+      const advanced = i<2 || (i===2 && qualSet.has(g));
+      let badge = i<2 ? posCls[i] : i===2 ? (qualSet.has(g) ? "t" : "t out") : "x";
+      rows+=`<tr class="${advanced?'adv':''}">
+        <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} ${t.name}${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}</td>
+        <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td></tr>`;
+    });
+    let fx="";
+    FIXTURES[g].forEach(([h,a],i)=>{
+      const [hs,as] = fxScore(g,i,h,a);
+      const rc = hs>as?"h":hs<as?"a":"d";
+      fx+=`<div class="fx">
+        <span class="home ${hs>as?"wn h":""}" data-fx="${g+i}" data-dir="h" title="Click: +1 goal for ${h}">${FLAG[h]} ${h}</span>
+        <span class="score ${rc}" data-fx="${g+i}" data-dir="r" title="Click to reset to the projected score">${hs}–${as}</span>
+        <span class="away ${hs<as?"wn a":""}" data-fx="${g+i}" data-dir="a" title="Click: +1 goal for ${a}">${a} ${FLAG[a]}</span></div>`;
+    });
+    gh+=`<div class="group"><h3>Group ${g}</h3>
+      <table><tr><th class="l">Team</th><th>Rtg</th><th>Pts</th><th>GD</th></tr>${rows}</table>
+      <div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games (click a team for +1 goal)</div>${fx}</div>
+    </div>`;
+  }
+  document.getElementById("groups").innerHTML=gh;
+
+  // ----- best third-placed teams -----
+  const slotOf={}; for(const m in thirdAssign) slotOf[thirdAssign[m]]=m;
+  let tr="";
+  ranked.forEach((t,idx)=>{
+    const q=idx<8;
+    tr+=`<tr class="${q?'q':'o'}">
+      <td class="rk">${idx+1}</td>
+      <td class="l">Group ${t.g}</td>
+      <td class="l">${FLAG[t.name]||""} ${t.name}</td>
+      <td>${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>
+      <td class="l st">${q?('✓ qualifies → Match '+slotOf[t.g]):'✗ eliminated'}</td></tr>`;
+    if(idx===7) tr+=`<tr class="cut"><td colspan="7">QUALIFICATION CUT‑OFF · TOP 8 ADVANCE</td></tr>`;
+  });
+  document.getElementById("thirds").innerHTML=
+    `<table class="thirds"><tr>
+       <th class="l">#</th><th class="l">Group</th><th class="l">Team</th>
+       <th>Rtg</th><th>Pts</th><th>GD</th><th class="l">Status</th></tr>${tr}</table>`;
+
+  // ----- bracket -----
+  const champ=R.winner(104);
+  const champPath=new Set();                       // matches the projected champion wins, for highlighting
+  if(champ) for(const round of ROUNDS) for(const m of round.ms) if(R.winner(m)===champ) champPath.add(m);
+  let bh="";
+  for(const round of ROUNDS){
+    let col=`<div class="round"><h4>${round.name}</h4>`;
+    for(const m of round.ms){
+      const [pa,pb]=R.participants(m);
+      const w=R.winner(m);
+      col+=`<div class="tie ${champPath.has(m)?'path':''}"><div class="mno">Match ${m}</div>
+        ${slotHTML(m,pa,pb,w)}${slotHTML(m,pb,pa,w)}</div>`;
+    }
+    col+="</div>"; bh+=col;
+  }
+  document.getElementById("bracket").innerHTML=bh;
+
+  document.getElementById("mmode").textContent =
+    flatMargins ? "⚽ Scores: all 1–0" : "⚽ Scores: by strength";
+  document.getElementById("omode").textContent =
+    oddsMode ? "📈 Favourite: betting market" : "📊 Favourite: my ratings";
+
+  document.getElementById("champ").innerHTML = champ
+    ? `<div class="lbl">Projected Champion</div><div class="team">${FLAG[champ]||""} ${champ}</div>`
+    : `<div class="lbl">Champion</div><div class="team" style="color:#475068">— TBD —</div>`;
+
+  attachEvents();
+}
+
+function slotHTML(m,team,opp,w){
+  if(!team) return `<div class="slot empty"><span class="nm">— TBD —</span></div>`;
+  const isW = team===w;
+  const wp = opp ? Math.round(pWin(team,opp)*100) : null;
+  return `<div class="slot ${isW?'win':''}" data-ko="${m}" data-team="${team}">
+    <span class="nm"><span class="flag">${FLAG[team]||""}</span>${team}</span>
+    <span class="rgt">${wp!==null?`<span class="wp" title="Win probability for this tie">${wp}%</span>`:''}<span class="rt">${strength(team)}</span></span></div>`;
+}
+
+function attachEvents(){
+  document.querySelectorAll("[data-fx]").forEach(el=>{
+    el.onclick=()=>{
+      const id=el.dataset.fx, dir=el.dataset.dir;
+      const g=id.slice(0,1), i=+id.slice(1);
+      const [h,a]=FIXTURES[g][i];
+      if(dir==="r"){ delete fxOverride[id]; render(); return; }   // reset to projected score
+      let [gh,ga]=(id in fxOverride)?fxOverride[id]:strengthScore(h,a);
+      if(dir==="h") gh=Math.min(gh+1,15); else ga=Math.min(ga+1,15);  // the clicked team scores
+      fxOverride[id]=[gh,ga];
+      render();
+    };
+  });
+  document.querySelectorAll("[data-ko]").forEach(el=>{
+    el.onclick=()=>{ koOverride[+el.dataset.ko]=el.dataset.team; render(); };
+  });
+}
+
+function renderMC(res){
+  const {tally,N}=res;
+  const teams=Object.keys(tally).sort((a,b)=> tally[b].t-tally[a].t || tally[b].f-tally[a].f || tally[b].sf-tally[a].sf);
+  const top=teams.slice(0,20);
+  const pct=c=>100*c/N;
+  const maxT=Math.max(1,...top.map(n=>tally[n].t));
+  let rows="";
+  top.forEach((n,idx)=>{
+    const mkt = ODDS[n]!==undefined ? 100/(ODDS[n]+100) : null;
+    let edge="—";
+    if(mkt!==null){
+      const e = pct(tally[n].t) - 100*mkt;            // model title% minus market implied%
+      const col = e>=0 ? "var(--accent)" : "var(--red)";
+      edge = `<span style="color:${col}">${e>=0?'+':''}${e.toFixed(1)}</span>`;
+    }
+    rows+=`<tr>
+      <td class="rk">${idx+1}</td>
+      <td class="l">${FLAG[n]||""} ${n}</td>
+      <td class="l"><span class="pbar" style="width:${Math.max(2,Math.round(70*tally[n].t/maxT))}px"></span>${pct(tally[n].t).toFixed(1)}%</td>
+      <td>${pct(tally[n].f).toFixed(1)}%</td>
+      <td>${pct(tally[n].sf).toFixed(1)}%</td>
+      <td>${pct(tally[n].ko).toFixed(0)}%</td>
+      <td class="st">${mkt!==null?(100*mkt).toFixed(1)+'%':'—'}</td>
+      <td>${edge}</td></tr>`;
+  });
+  const champ=top[0];
+  document.getElementById("mcout").innerHTML=
+    `<div class="hint" style="margin-bottom:8px">${N.toLocaleString()} simulations · favourite source: <b>${oddsMode?'betting market':'my ratings'}</b> · remaining scores via the expected‑goals model. `+
+    `Most likely champion: <b style="color:var(--gold)">${FLAG[champ]||''} ${champ}</b> (${pct(tally[champ].t).toFixed(1)}%). “Mkt” = bookmakers' implied title chance; “Edge” = model − market (green = model rates them higher than the market).</div>`+
+    `<table class="thirds"><tr><th class="l">#</th><th class="l">Team</th><th class="l">Win title</th>`+
+    `<th>Final</th><th>Semi</th><th>Reach KO</th><th class="l">Mkt</th><th>Edge</th></tr>${rows}</table>`;
+}
+
+document.getElementById("mc").onclick=()=>{
+  const btn=document.getElementById("mc");
+  btn.textContent="Running…"; btn.disabled=true;
+  setTimeout(()=>{ renderMC(runMonteCarlo(10000)); btn.textContent="🎲 Run 10,000 simulations"; btn.disabled=false; }, 30);
+};
+
+document.getElementById("reset").onclick=()=>{ fxOverride={}; koOverride={}; render(); };
+document.getElementById("mmode").onclick=()=>{ flatMargins=!flatMargins; render(); };
+document.getElementById("omode").onclick=()=>{ oddsMode=!oddsMode; render(); };
+
+document.getElementById("footnote").innerHTML =
+  `<b>How it works.</b> Group tables are built from the <b>real played scorelines</b> (in <code>PLAYED</code>) as of 24 Jun 2026. `+
+  `Most groups have one fixture left; <b>Groups K and L are a matchday behind</b>, so they have three games left to simulate. `+
+  `Every remaining group game and every knockout tie defaults to a win for the higher‑rated (favourite) team. `+
+  `The <b>“Scores”</b> toggle sets how remaining games are scored: <i>all 1–0</i> (minimal — the favourite wins by one) or <i>by strength</i>, a Poisson expected‑goals model where the rating gap sets each side's expected goals around the ~2.6/game World Cup average (≈1 goal of supremacy per 250 rating points) — so underdogs can score and only big mismatches give clean‑sheet blowouts. `+
+  `<b>Run simulations</b> replays the rest of the tournament thousands of times (real results fixed, remaining games drawn from that goal model, knockouts decided by a logistic win probability) to estimate each team's chance of winning the title or reaching each round — compare it against the bookmakers' implied chance in the “Mkt” column. `+
+  `Standings use the 2026 FIFA tiebreak chain — <b>head‑to‑head first</b>: points → <b>H2H points → H2H goal difference → H2H goals</b> → overall GD → overall goals → rating (new for 2026; earlier World Cups used overall GD before H2H). Any place decided by the head‑to‑head result is tagged <span class="h2h">H2H</span>. `+
+  `The eight best third‑placed teams are then slotted into the Round of 32 via FIFA's eligibility matrix (a valid constraint‑satisfying assignment; the official lookup may order ties differently). `+
+  `The <b>“Favourite”</b> toggle chooses what decides every remaining group game and knockout tie: my subjective ratings, or the <b>betting market</b> `+
+  `(outright title odds in <code>ODDS</code>, converted to implied probability and rescaled; unlisted longshots reuse their rating). In market mode the displayed number is that market strength. `+
+  `Ratings are approximate — edit the <code>GROUPS</code> or <code>ODDS</code> objects to change who's favoured. Click a team in any fixture for +1 goal, click a knockout match to flip it, or “Reset”.`;
+
+render();
+</script>
+</body>
+</html>
