@@ -379,27 +379,38 @@ function computeGroups(){
   return tables;
 }
 
-// Mathematically eliminated = locked into 4th place (≥3 teams already have more points
-// than this team can ever reach), so it cannot finish top-2 or 3rd → can never advance.
-// "Decided" games = real results (PLAYED) plus any scoreline you've clicked in (fxOverride);
-// every still-open fixture is assumed winnable, so this is a true mathematical guarantee.
+// Mathematically eliminated = cannot finish in the top 3 of its group under ANY combination of
+// remaining results (only the top 3 can ever advance). We enumerate every outcome of the still-open
+// games and apply the real tiebreakers: head-to-head is fixed by results already played, so a team
+// that lost the head-to-head can't escape a points tie. Goal-difference ties are resolved in the
+// team's favour (best case), so a team is only flagged when truly dead — never a false positive.
+// "Decided" games = real results (PLAYED) plus any scoreline you've clicked in (fxOverride).
 function eliminatedTeams(){
-  const award=(pts,h,a,hg,ag)=>{ if(hg>ag)pts[h]+=3; else if(ag>hg)pts[a]+=3; else {pts[h]++;pts[a]++;} };
   const dead=new Set();
   for(const g in GROUPS){
-    const pts={}, open={};
-    for(const [n] of GROUPS[g]){ pts[n]=0; open[n]=0; }
-    PLAYED[g].forEach(([h,hg,ag,a])=>award(pts,h,a,hg,ag));
+    const teams=GROUPS[g].map(x=>x[0]);
+    const decided=[], open=[];
+    PLAYED[g].forEach(([h,hg,ag,a])=> decided.push([h,a, hg>ag?1:ag>hg?-1:0]));
     FIXTURES[g].forEach(([h,a],i)=>{
       const k=g+i;
-      if(k in fxOverride){ const [hg,ag]=fxOverride[k]; award(pts,h,a,hg,ag); }
-      else { open[h]++; open[a]++; }
+      if(k in fxOverride){ const [hg,ag]=fxOverride[k]; decided.push([h,a, hg>ag?1:ag>hg?-1:0]); }
+      else open.push([h,a]);
     });
-    for(const [n] of GROUPS[g]){
-      const maxPts = pts[n] + 3*open[n];
-      let above=0;
-      for(const [o] of GROUPS[g]) if(o!==n && pts[o] > maxPts) above++;
-      if(above>=3) dead.add(n);
+    const K=open.length, combos=3**K;
+    for(const T of teams){
+      let canReachTop3=false;
+      for(let mask=0; mask<combos && !canReachTop3; mask++){
+        const pts={}, beat={};
+        teams.forEach(t=>{ pts[t]=0; beat[t]={}; });
+        const apply=(h,a,r)=>{ if(r>0){pts[h]+=3;beat[h][a]=1;} else if(r<0){pts[a]+=3;beat[a][h]=1;} else {pts[h]++;pts[a]++;} };
+        decided.forEach(([h,a,r])=> apply(h,a,r));
+        let mm=mask;
+        for(let j=0;j<K;j++){ const r=(mm%3)-1; mm=(mm/3)|0; apply(open[j][0],open[j][1],r); }
+        let above=0;                                   // teams certainly finishing above T
+        for(const O of teams) if(O!==T && (pts[O]>pts[T] || (pts[O]===pts[T] && beat[O][T]))) above++;
+        if(above<3) canReachTop3=true;                 // some scenario leaves T in the top 3
+      }
+      if(!canReachTop3) dead.add(T);
     }
   }
   return dead;
