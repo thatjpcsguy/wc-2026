@@ -47,6 +47,9 @@
   .group{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
   .group h3{margin:0 0 8px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
   .group h3 span{color:var(--muted);font-weight:400;font-size:11px}
+  .group.complete{border-color:rgba(25,195,125,.4)}
+  .group h3 .gdone{background:rgba(25,195,125,.18);color:var(--accent);font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:10px}
+  .fixtures.done .hint{color:var(--accent);text-align:center;padding:6px 0 2px}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;text-align:right;padding:2px 3px}
   th.l,td.l{text-align:left}
@@ -250,7 +253,7 @@ const GROUPS = {
 // Actual played results (real scorelines from the tournament, as of 23 Jun 2026): [home, homeGoals, awayGoals, away]
 const PLAYED = {
  A:[["Mexico",2,0,"South Africa"],["South Korea",2,1,"Czechia"],["Czechia",1,1,"South Africa"],["Mexico",1,0,"South Korea"]],
- B:[["Canada",1,1,"Bosnia"],["Qatar",1,1,"Switzerland"],["Switzerland",4,1,"Bosnia"],["Canada",6,0,"Qatar"]],
+ B:[["Canada",1,1,"Bosnia"],["Qatar",1,1,"Switzerland"],["Switzerland",4,1,"Bosnia"],["Canada",6,0,"Qatar"],["Switzerland",2,1,"Canada"],["Bosnia",3,1,"Qatar"]],
  C:[["Brazil",1,1,"Morocco"],["Haiti",0,1,"Scotland"],["Scotland",0,1,"Morocco"],["Brazil",3,0,"Haiti"]],
  D:[["USA",4,1,"Paraguay"],["Australia",2,0,"Türkiye"],["USA",2,0,"Australia"],["Türkiye",0,1,"Paraguay"]],
  E:[["Germany",7,1,"Curaçao"],["Ivory Coast",1,0,"Ecuador"],["Germany",2,1,"Ivory Coast"],["Ecuador",0,0,"Curaçao"]],
@@ -283,21 +286,20 @@ const MATCH_ODDS = {
  "Egypt|Iran":     {h:0.39, d:0.35, a:0.26}
 };
 
-// Remaining Matchday-3 fixtures (home vs away), per ESPN schedule
+// Remaining (unplayed) group fixtures — updated 2026-06-25.
 const FIXTURES = {
  A:[["Czechia","Mexico"],["South Africa","South Korea"]],
- B:[["Switzerland","Canada"],["Bosnia","Qatar"]],
+ B:[],
  C:[["Scotland","Brazil"],["Morocco","Haiti"]],
  D:[["Türkiye","USA"],["Paraguay","Australia"]],
- E:[["Ecuador","Germany"],["Curaçao","Ivory Coast"]],
+ E:[["Curaçao","Ivory Coast"],["Ecuador","Germany"]],
  F:[["Japan","Sweden"],["Tunisia","Netherlands"]],
  G:[["Egypt","Iran"],["New Zealand","Belgium"]],
  H:[["Cape Verde","Saudi Arabia"],["Uruguay","Spain"]],
  I:[["Norway","France"],["Senegal","Iraq"]],
  J:[["Algeria","Austria"],["Jordan","Argentina"]],
- // Groups K & L are a matchday behind; each now has three fixtures left (one MD2 game + both MD3 games).
- K:[["Colombia","Portugal"],["Uzbekistan","DR Congo"]],
- L:[["England","Panama"],["Croatia","Ghana"]]
+ K:[["Colombia","Portugal"],["DR Congo","Uzbekistan"]],
+ L:[["Panama","England"],["Croatia","Ghana"]]
 };
 
 // Round of 32 — official 2026 bracket. w=group winner, ru=runner-up, th=3rd assigned to that match slot
@@ -489,15 +491,45 @@ function computeGroups(){
 //   through = top-2 guaranteed · top3 = top-3 guaranteed · alive = could still go either way · out = can't reach top 3
 // For a team with exactly one game left we also record what each result (W/D/L) would secure.
 // "Decided" games = real results (PLAYED) plus any scoreline you've clicked in (fxOverride).
+// finishing place for T in one combo. bias=+1 gives T the benefit on goal-difference ties
+// (best case), bias=-1 penalises it (worst case). Real scorelines drive decided games' GD/goals;
+// open games use a generous/stingy margin per the bias, so a settled group is fully determined.
+function placeInCombo(teams, decided, open, oRes, T, bias){
+  const pts={}, gd={}, gf={}, beat={};
+  teams.forEach(t=>{ pts[t]=0; gd[t]=0; gf[t]=0; beat[t]={}; });
+  const ap=(h,a,hg,ag)=>{ gf[h]+=hg; gf[a]+=ag; gd[h]+=hg-ag; gd[a]+=ag-hg;
+    if(hg>ag){pts[h]+=3;beat[h][a]=1;} else if(ag>hg){pts[a]+=3;beat[a][h]=1;} else {pts[h]++;pts[a]++;} };
+  decided.forEach(([h,a,hg,ag])=> ap(h,a,hg,ag));
+  open.forEach(([h,a],j)=>{ const r=oRes[j];
+    if(r===0){ ap(h,a,0,0); return; }
+    const w=r>0?h:a, l=r>0?a:h;
+    const m = (w===T) ? (bias>0?4:1) : (bias>0?1:4);   // T's wins big in best case; rivals' wins big in worst
+    ap(w,l,m,0);
+  });
+  let above=0;
+  for(const O of teams){ if(O===T) continue;
+    if(pts[O]>pts[T]) { above++; continue; }
+    if(pts[O]<pts[T]) continue;
+    if(beat[O][T]) { above++; continue; }              // head-to-head first
+    if(beat[T][O]) continue;
+    if(gd[O]>gd[T]) { above++; continue; }              // then real goal difference
+    if(gd[O]<gd[T]) continue;
+    if(gf[O]>gf[T]) { above++; continue; }              // then goals scored
+    if(gf[O]<gf[T]) continue;
+    if(bias<0) above++;                                 // dead level: bias breaks it
+  }
+  return above+1;
+}
+
 function teamStatuses(){
   const info={};
   for(const g in GROUPS){
     const teams=GROUPS[g].map(x=>x[0]);
     const decided=[], open=[];
-    PLAYED[g].forEach(([h,hg,ag,a])=> decided.push([h,a, hg>ag?1:ag>hg?-1:0]));
+    PLAYED[g].forEach(([h,hg,ag,a])=> decided.push([h,a,hg,ag]));
     FIXTURES[g].forEach(([h,a],i)=>{
       const k=g+i;
-      if(k in fxOverride){ const [hg,ag]=fxOverride[k]; decided.push([h,a, hg>ag?1:ag>hg?-1:0]); }
+      if(k in fxOverride){ const [hg,ag]=fxOverride[k]; decided.push([h,a,hg,ag]); }
       else open.push([h,a]);
     });
     const K=open.length, combos=3**K;
@@ -506,20 +538,14 @@ function teamStatuses(){
       const tg = open.findIndex(([h,a])=>h===T||a===T);
       let best=4, worst=1; const wbr={W:1,D:1,L:1};
       for(let mask=0; mask<combos; mask++){
-        const pts={}, beat={}; teams.forEach(t=>{ pts[t]=0; beat[t]={}; });
-        const apply=(h,a,r)=>{ if(r>0){pts[h]+=3;beat[h][a]=1;} else if(r<0){pts[a]+=3;beat[a][h]=1;} else {pts[h]++;pts[a]++;} };
-        decided.forEach(([h,a,r])=> apply(h,a,r));
-        let mm=mask; const res=[];
-        for(let j=0;j<K;j++){ const r=(mm%3)-1; mm=(mm/3)|0; apply(open[j][0],open[j][1],r); res.push(r); }
-        let ab=0, apn=0;                                // teams above T — best case (ab) and worst case (apn)
-        for(const O of teams){ if(O===T) continue;
-          if(pts[O]>pts[T] || (pts[O]===pts[T] && beat[O][T]))  ab++;
-          if(pts[O]>pts[T] || (pts[O]===pts[T] && !beat[T][O])) apn++;
-        }
-        best=Math.min(best,ab+1); worst=Math.max(worst,apn+1);
-        if(oneGame){ const tw=open[tg][0]===T?res[tg]:-res[tg]; const k=tw>0?"W":tw<0?"L":"D"; wbr[k]=Math.max(wbr[k],apn+1); }
+        let mm=mask; const oRes=[];
+        for(let j=0;j<K;j++){ oRes.push((mm%3)-1); mm=(mm/3)|0; }
+        best=Math.min(best, placeInCombo(teams,decided,open,oRes,T,+1));
+        const pw=placeInCombo(teams,decided,open,oRes,T,-1);
+        worst=Math.max(worst, pw);
+        if(oneGame){ const tw=open[tg][0]===T?oRes[tg]:-oRes[tg]; const k=tw>0?"W":tw<0?"L":"D"; wbr[k]=Math.max(wbr[k],pw); }
       }
-      info[T]={ best, worst, oneGame, wbr,
+      info[T]={ best, worst, oneGame, wbr, settled: K===0,
         status: best>=4?"out" : worst<=2?"through" : worst<=3?"top3" : "alive" };
     }
   }
@@ -714,9 +740,13 @@ function render(){
         <span class="score ${rc}" data-fx="${g+i}" data-dir="r" title="Click for 0–0 · click again to restore the projected score">${hs}–${as}</span>
         <span class="away ${hs<as?"wn a":""}" data-fx="${g+i}" data-dir="a" title="Click: +1 goal for ${a}">${a} ${FLAG[a]}</span></div>`;
     });
-    gh+=`<div class="group"><h3>Group ${g}</h3>
+    const done = FIXTURES[g].length===0;
+    const fxSection = done
+      ? `<div class="fixtures done"><div class="hint">✓ Group complete — final standings</div></div>`
+      : `<div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games · click a team for +1, click the score for 0–0</div>${fx}</div>`;
+    gh+=`<div class="group${done?' complete':''}"><h3>Group ${g}${done?'<span class="gdone">FINAL</span>':''}</h3>
       <table><tr><th class="l">Team</th><th>Rtg</th><th>Pts</th><th>GD</th>${mcGroups?'<th title="Win group">Win</th><th title="Advance to knockouts">Adv</th>':''}</tr>${rows}</table>
-      <div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games · click a team for +1, click the score for 0–0</div>${fx}</div>
+      ${fxSection}
     </div>`;
   }
   document.getElementById("groups").innerHTML=gh;
