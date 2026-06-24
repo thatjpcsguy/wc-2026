@@ -24,6 +24,11 @@
   button:hover{border-color:var(--accent);color:#fff}
   button.primary{background:var(--accent);color:#04240f;border-color:var(--accent);font-weight:600}
   .hint{color:var(--muted);font-size:12px}
+  .scenbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .scenbar .shint{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  .schip{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .schip:hover{border-color:var(--accent)}
+  .schip b{color:var(--muted);font-weight:700;cursor:pointer} .schip b:hover{color:var(--red)}
   main{padding:20px 26px 60px}
   h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
     margin:30px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
@@ -162,8 +167,10 @@
     <button id="hmode"></button>
     <button id="mc">🎲 Run 10,000 simulations</button>
     <button id="share">🔗 Copy link</button>
+    <button id="save">💾 Save scenario</button>
     <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> for +1, or the score for 0–0</span>
   </div>
+  <div class="scenbar" id="scenbar"></div>
   <div class="legend">
     <span><span class="pos w" style="vertical-align:middle"> </span><b>Group winner</b></span>
     <span><span class="pos r" style="vertical-align:middle"> </span><b>Runner‑up</b></span>
@@ -347,6 +354,7 @@ let flatMargins = true; // true = every projected win defaults to 1–0; false =
 let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
 let hostBoost = false;  // adds a home-tournament strength bump for USA / Mexico / Canada
 let mcGroups = null;    // latest Monte Carlo results {tally,N}, shown as probabilities in the group tables
+let lastChamp = null;   // projected champion from the most recent render (used to name saved scenarios)
 
 /* ============================================================
    SIMULATION
@@ -625,6 +633,7 @@ function render(){
   // ----- tournament outlook summary -----
   {
     const champ=R.winner(104), f1=R.winner(101), f2=R.winner(102);
+    lastChamp=champ;
     const other = f1===champ?f2:f1;
     let through=0, contention=0, out=0;
     for(const t in stat){ const s=stat[t].status; if(s==="through")through++; else if(s==="out")out++; else contention++; }
@@ -887,6 +896,27 @@ document.getElementById("mc").onclick=()=>{
 };
 
 document.getElementById("reset").onclick=()=>{ mcGroups=null; fxOverride={}; koOverride={}; render(); };
+
+// --- saved scenarios (localStorage) ---
+function getScen(){ try{ return JSON.parse(localStorage.getItem("wc2026-scen")||"[]"); }catch(e){ return []; } }
+function setScen(a){ try{ localStorage.setItem("wc2026-scen", JSON.stringify(a)); }catch(e){} renderScenBar(); }
+function scenName(){
+  const tags=[]; if(oddsMode)tags.push("market"); if(hostBoost)tags.push("host"); if(!flatMargins)tags.push("xG");
+  const edits=Object.keys(fxOverride).length+Object.keys(koOverride).length; if(edits)tags.push(edits+" edit"+(edits>1?"s":""));
+  return (lastChamp||"Scenario") + (tags.length? " · "+tags.join(", ") : "");
+}
+function renderScenBar(){
+  const a=getScen(), el=document.getElementById("scenbar");
+  if(!a.length){ el.innerHTML=""; return; }
+  el.innerHTML=`<span class="shint">Saved</span>`+a.map((s,i)=>`<span class="schip" data-load="${i}">${s.name} <b data-del="${i}">✕</b></span>`).join("");
+  el.querySelectorAll("[data-load]").forEach(c=>c.onclick=(e)=>{
+    if(e.target.dataset.del!==undefined){ const a2=getScen(); a2.splice(+e.target.dataset.del,1); setScen(a2); return; }
+    const s=getScen()[+c.dataset.load];
+    fxOverride={};koOverride={};flatMargins=true;oddsMode=false;hostBoost=false;mcGroups=null;
+    location.hash = s.hash ? "#"+s.hash : ""; applyHash(); render();
+  });
+}
+document.getElementById("save").onclick=()=>{ const a=getScen(); a.push({name:scenName(), hash:stateToHash().replace(/^#/,"")}); setScen(a); };
 document.getElementById("mmode").onclick=()=>{ mcGroups=null; flatMargins=!flatMargins; render(); };
 document.getElementById("omode").onclick=()=>{ mcGroups=null; oddsMode=!oddsMode; render(); };
 document.getElementById("hmode").onclick=()=>{ mcGroups=null; hostBoost=!hostBoost; render(); };
@@ -944,6 +974,7 @@ document.getElementById("modal").addEventListener("click", e=>{ if(e.target.id==
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
 applyHash();
 render();
+renderScenBar();
 </script>
 </body>
 </html>
