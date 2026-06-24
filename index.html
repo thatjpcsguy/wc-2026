@@ -136,9 +136,11 @@
   .pbar{display:inline-block;height:9px;border-radius:2px;background:var(--accent2);margin-right:7px;vertical-align:middle;min-width:2px}
 
   /* Bracket */
-  .bracket{display:flex;gap:18px;overflow-x:auto;padding-bottom:14px}
-  .round{flex:0 0 auto;width:210px;display:flex;flex-direction:column;gap:10px;justify-content:space-around}
-  .round h4{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center}
+  .bracket{display:flex;gap:18px;overflow-x:auto;padding-bottom:14px;align-items:stretch}
+  .round{flex:0 0 auto;width:210px;display:flex;flex-direction:column}
+  /* ties fill the column and space evenly, so each round centres between its two feeders */
+  .round .ties{flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:8px}
+  .round h4{flex:0 0 auto;margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:center}
   .round h4 .rdate{display:block;font-size:9px;letter-spacing:.5px;color:#475068;font-weight:400;margin-top:2px}
   .tie{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:12.5px}
   .tie.path{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
@@ -775,14 +777,14 @@ function render(){
   if(champ) for(const round of ROUNDS) for(const m of round.ms) if(R.winner(m)===champ) champPath.add(m);
   let bh="";
   for(const round of ROUNDS){
-    let col=`<div class="round"><h4>${round.name}<span class="rdate">${round.date||""}</span></h4>`;
+    let col=`<div class="round"><h4>${round.name}<span class="rdate">${round.date||""}</span></h4><div class="ties">`;
     for(const m of round.ms){
       const [pa,pb]=R.participants(m);
       const w=R.winner(m);
       col+=`<div class="tie ${champPath.has(m)?'path':''}"><div class="mno">Match ${m}</div>
         ${slotHTML(m,pa,pb,w)}${slotHTML(m,pb,pa,w)}</div>`;
     }
-    col+="</div>"; bh+=col;
+    col+="</div></div>"; bh+=col;
   }
   document.getElementById("bracket").innerHTML=bh;
 
