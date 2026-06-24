@@ -28,6 +28,15 @@
   h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
     margin:30px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
 
+  /* Summary */
+  .summary{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+  .scard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:150px;flex:1}
+  .scard .lab{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  .scard .val{font-size:19px;font-weight:800;margin-top:3px}
+  .scard .sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .scard.gold{border-color:var(--gold);background:linear-gradient(180deg,#241d04,#141a16)}
+  .scard.gold .val{color:var(--gold)}
+
   /* Groups */
   .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
   .group{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
@@ -75,6 +84,17 @@
   .mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center}
   .mgrid div{background:var(--panel2);border-radius:8px;padding:8px 4px}
   .mgrid b{display:block;font-size:16px;color:#fff} .mgrid span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+
+  /* Mobile */
+  @media(max-width:640px){
+    header{padding:16px 14px 12px} main{padding:16px 14px 50px}
+    h1{font-size:17px} .sub{font-size:12px}
+    .groups{grid-template-columns:1fr}
+    .scard{min-width:46%}
+    .round{width:180px}
+    .modal-card{padding:16px}
+    .mgrid{grid-template-columns:repeat(5,1fr);gap:4px} .mgrid b{font-size:13px}
+  }
   .h2h{font-size:8px;background:rgba(224,138,43,.22);color:var(--amber);padding:1px 4px;
     border-radius:3px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700}
   .fixtures{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
@@ -154,6 +174,9 @@
   </div>
 </header>
 <main>
+  <h2>Tournament Outlook</h2>
+  <div class="summary" id="summary"></div>
+
   <h2>Group Stage — projected final tables</h2>
   <div class="groups" id="groups"></div>
 
@@ -598,6 +621,26 @@ function render(){
   const posCls=["w","r","t","x"];
   const posTxt=["1","2","3","4"];
   const stat=teamStatuses();
+
+  // ----- tournament outlook summary -----
+  {
+    const champ=R.winner(104), f1=R.winner(101), f2=R.winner(102);
+    const other = f1===champ?f2:f1;
+    let through=0, contention=0, out=0;
+    for(const t in stat){ const s=stat[t].status; if(s==="through")through++; else if(s==="out")out++; else contention++; }
+    const cards=[];
+    cards.push(`<div class="scard gold"><div class="lab">Projected champion</div><div class="val">${FLAG[champ]||""} ${champ||"—"}</div>${mcGroups&&champ?`<div class="sub">${(100*mcGroups.tally[champ].t/mcGroups.N).toFixed(0)}% across simulations</div>`:`<div class="sub">favourite wins every tie</div>`}</div>`);
+    cards.push(`<div class="scard"><div class="lab">Other finalist</div><div class="val">${FLAG[other]||""} ${other||"—"}</div><div class="sub">loses the final to the champion</div></div>`);
+    cards.push(`<div class="scard"><div class="lab">Qualified · alive · out</div><div class="val">${through} · ${contention} · ${out}</div><div class="sub">of 48 teams</div></div>`);
+    if(mcGroups){
+      let best=null; for(const n in ODDS){ const e=100*mcGroups.tally[n].t/mcGroups.N - 100/(ODDS[n]+100); if(best===null||e>best.e) best={n,e}; }
+      if(best) cards.push(`<div class="scard"><div class="lab">Best value vs market</div><div class="val">${FLAG[best.n]||""} ${best.n}</div><div class="sub">model ${best.e>=0?"+":""}${best.e.toFixed(1)} pts vs the odds</div></div>`);
+    } else {
+      cards.push(`<div class="scard"><div class="lab">Simulation</div><div class="val" style="font-size:13px;color:var(--muted);font-weight:600">Run 10,000× for odds &amp; value picks</div></div>`);
+    }
+    document.getElementById("summary").innerHTML=cards.join("");
+  }
+
   let gh="";
   for(const g of Object.keys(GROUPS)){
     const arr=tables[g];
