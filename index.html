@@ -271,6 +271,18 @@ const ODDS = {
  Mexico:4500, Belgium:5000, Colombia:5000, Switzerland:8000
 };
 
+// Live per-match probabilities (home win / draw / away win, vig-removed) for upcoming group games where
+// bookmakers have posted them (DraftKings / market consensus, ~24 Jun 2026). Used only in MARKET mode; any
+// fixture not listed here — and every knockout tie — falls back to the outright-title-odds strength.
+// Keyed by "Home|Away" matching the FIXTURES order.
+const MATCH_ODDS = {
+ "Norway|France":  {h:0.18, d:0.22, a:0.60},
+ "Uruguay|Spain":  {h:0.14, d:0.23, a:0.63},
+ "Türkiye|USA":    {h:0.28, d:0.24, a:0.48},
+ "Japan|Sweden":   {h:0.47, d:0.26, a:0.27},
+ "Egypt|Iran":     {h:0.39, d:0.35, a:0.26}
+};
+
 // Remaining Matchday-3 fixtures (home vs away), per ESPN schedule
 const FIXTURES = {
  A:[["Czechia","Mexico"],["South Africa","South Korea"]],
@@ -390,15 +402,27 @@ function pWin(a,b){ return 1/(1+Math.pow(10,(strength(b)-strength(a))/350)); }
 // Poisson sampler (Knuth) — for the Monte Carlo mode
 function poisson(l){ const L=Math.exp(-l); let k=0,p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; }
 function sampleScore(h,a){ const [lh,la]=lambdas(h,a); return [poisson(lh),poisson(la)]; }
+// One sampled scoreline for a group fixture: market mode uses posted match odds (outcome from odds,
+// scoreline shape from the goal model); otherwise the strength-based Poisson model.
+function sampleFixture(h,a){
+  const o = oddsMode ? MATCH_ODDS[h+"|"+a] : null;
+  if(!o) return sampleScore(h,a);
+  const r=Math.random(), want = r<o.h ? 1 : r<o.h+o.d ? 0 : -1;   // 1 home win, 0 draw, -1 away win
+  for(let k=0;k<16;k++){ const [x,y]=sampleScore(h,a); const out=x>y?1:x<y?-1:0; if(out===want) return [x,y]; }
+  return want>0?[1,0] : want<0?[0,1] : [1,1];                     // fallback scoreline
+}
 
 // Deterministic "most likely" scoreline for the default projection (favourite wins each tie).
 //  flatMargins → every win is a minimal 1–0; otherwise round the expected goals, with the
 //  favourite nudged to win if the rounding produced a draw.
 function strengthScore(h,a){
-  if(flatMargins) return strength(h)>=strength(a) ? [1,0] : [0,1];
+  // favourite from live match odds (market mode, where posted) else from strength
+  const o = oddsMode ? MATCH_ODDS[h+"|"+a] : null;
+  const homeFav = o ? (o.h>=o.a) : (strength(h)>=strength(a));
+  if(flatMargins) return homeFav ? [1,0] : [0,1];
   const [lh,la]=lambdas(h,a);
   let gh=Math.round(lh), ga=Math.round(la);
-  if(strength(h)>=strength(a)){ if(gh<=ga) gh=ga+1; } else { if(ga<=gh) ga=gh+1; }
+  if(homeFav){ if(gh<=ga) gh=ga+1; } else { if(ga<=gh) ga=gh+1; }
   return [gh,ga];
 }
 // active scoreline for a remaining fixture: a manual [home,away] override, or the projection
@@ -587,7 +611,7 @@ function simulateOnce(){
     const t={}; for(const [n] of GROUPS[g]) t[n]={name:n,r:strength(n),pts:0,gd:0,gf:0,h2h:false};
     const played=[];
     PLAYED[g].forEach(([h,hg,ag,a])=> applyMatch(t,played,h,a,hg,ag));
-    FIXTURES[g].forEach(([h,a])=>{ const [hg,ag]=sampleScore(h,a); applyMatch(t,played,h,a,hg,ag); });
+    FIXTURES[g].forEach(([h,a])=>{ const [hg,ag]=sampleFixture(h,a); applyMatch(t,played,h,a,hg,ag); });
     const arr=rankStandings(t,played,true);
     gr[g]={w:arr[0].name, ru:arr[1].name, th:arr[2].name};
     thirds.push({g,pts:arr[2].pts,gd:arr[2].gd,gf:arr[2].gf});
@@ -1008,7 +1032,7 @@ function openAbout(){
     `<div class="msec"><div class="mh">Projection</div><div class="atxt">Every remaining group game and knockout tie is won by the <b>favourite</b> (higher strength). The <b>Scores</b> toggle sets the margin: <i>all 1–0</i>, or an <b>expected-goals</b> model (Poisson; ~2.6 goals/game; ≈1 goal of supremacy per 250 rating points) so underdogs can score.</div></div>`+
     `<div class="msec"><div class="mh">Tiebreakers — 2026 rules</div><div class="atxt">Points → <b>head-to-head</b> (pts, GD, goals among tied teams) → overall GD → overall goals → rating. <b>Head-to-head comes first</b> — new for 2026. Places decided that way are tagged <span class="h2h">H2H</span>.</div></div>`+
     `<div class="msec"><div class="mh">Knockouts & 3rd places</div><div class="atxt">The official 2026 bracket (Round of 32 → Final). The <b>8 best third-placed teams</b> are ranked by points → GD → goals and slotted into the Round of 32 using <b>FIFA's official allocation table</b> (all 495 combinations).</div></div>`+
-    `<div class="msec"><div class="mh">Favourite source</div><div class="atxt">Toggle between my subjective <b>ratings</b> and the <b>betting market</b> (outright title odds → implied strength). Unlisted longshots keep their rating.</div></div>`+
+    `<div class="msec"><div class="mh">Favourite source</div><div class="atxt">Toggle between my subjective <b>ratings</b> and the <b>betting market</b>. In market mode, upcoming group games with posted <b>per-match odds</b> use them directly; everything else — unlisted games and all knockout ties — falls back to <b>outright title odds</b> converted to a strength value.</div></div>`+
     `<div class="msec"><div class="mh">Simulations</div><div class="atxt"><b>Run 10,000×</b> replays the tournament with random results (goals from the model, knockouts by win probability) for each team's title & round odds, with a model-vs-market <b>edge</b> column. <b>Random tournament</b> rolls one outcome onto the board.</div></div>`+
     `<div class="msec"><div class="mh">Make it yours</div><div class="atxt">Click a <b>team</b> for its scenario & path · click a fixture team for <b>+1</b> (right-click −1, the score for 0–0) · click a <b>knockout match</b> to flip it · <b>🔗 Copy link</b> and <b>💾 Save scenario</b> keep states · <b>🏟️ Host boost</b> for the hosts. Edit the <code>GROUPS</code> / <code>ODDS</code> objects to retune.</div></div>`;
   document.getElementById("modal").style.display="flex";
