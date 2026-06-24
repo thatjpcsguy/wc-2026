@@ -50,7 +50,31 @@
   .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
   .qc{font-size:8px;padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
   .qc.thru{background:rgba(25,195,125,.22);color:var(--accent)} .qc.t3{background:rgba(59,130,246,.22);color:var(--accent2)}
-  .group td.l[title]{cursor:help}
+  .qc.alv{background:rgba(133,149,184,.2);color:var(--muted)} .qc.dead2{background:rgba(224,83,59,.22);color:var(--red)}
+  tr[data-trow]{cursor:pointer} tr[data-trow]:hover td{background:var(--panel2)}
+
+  /* Team modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(4,7,14,.66);display:flex;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+  .modal-card{background:linear-gradient(180deg,#141d33,#0f1626);border:1px solid var(--line);border-radius:16px;
+    max-width:460px;width:92%;max-height:88vh;overflow:auto;padding:18px 20px 20px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+  .mtop{display:flex;justify-content:space-between;align-items:flex-start}
+  .mtitle{font-size:21px;font-weight:800}
+  .mx{background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+  .mx:hover{color:#fff;border:none}
+  .msub{color:var(--muted);font-size:12px;margin:2px 0 14px}
+  .msec{border-top:1px solid var(--line);padding:11px 0}
+  .msec.dim{color:var(--muted);font-size:12px}
+  .mh{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:7px}
+  .mstat{font-size:14px}
+  .mrow{font-size:13px;padding:2px 0;display:flex;align-items:center;gap:7px}
+  .mrow .wn{color:var(--accent);font-weight:700} .mrow .ls{color:var(--red);font-weight:700} .mrow .dr{color:var(--gold);font-weight:700}
+  .mrow.dim{color:var(--muted)}
+  .wdlbox{display:flex;flex-direction:column;gap:5px}
+  .wdl{display:flex;align-items:center;gap:10px;font-size:13px}
+  .wdl .wk{display:inline-block;width:42px;color:var(--muted)}
+  .mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center}
+  .mgrid div{background:var(--panel2);border-radius:8px;padding:8px 4px}
+  .mgrid b{display:block;font-size:16px;color:#fff} .mgrid span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
   .h2h{font-size:8px;background:rgba(224,138,43,.22);color:var(--amber);padding:1px 4px;
     border-radius:3px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700}
   .fixtures{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
@@ -145,6 +169,8 @@
 
   <div class="note" id="footnote"></div>
 </main>
+
+<div id="modal" class="modal-bg" style="display:none"><div class="modal-card" id="modalCard"></div></div>
 
 <script>
 /* ============================================================
@@ -581,8 +607,8 @@ function render(){
       const chip = st.status==="through" ? `<span class="qc thru">✓</span>`
                  : st.status==="top3"    ? `<span class="qc t3">T3</span>`
                  : isDead                ? `<span class="out">OUT</span>` : "";
-      rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}">
-        <td class="l" title="${tip}"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
+      rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}" data-trow="${t.name}" title="Click for details">
+        <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
         <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
     });
     let fx="";
@@ -692,7 +718,58 @@ function attachEvents(){
   document.querySelectorAll("[data-ko]").forEach(el=>{
     el.onclick=()=>{ mcGroups=null; koOverride[+el.dataset.ko]=el.dataset.team; render(); };
   });
+  document.querySelectorAll("tr[data-trow]").forEach(el=>{
+    el.onclick=()=>openTeam(el.dataset.trow);
+  });
 }
+
+// real record + remaining fixtures (with projected scores) for one team
+function teamCurrent(name){
+  const g=GRP[name];
+  let pts=0,gf=0,ga=0,w=0,d=0,l=0; const results=[],remaining=[];
+  PLAYED[g].forEach(([h,hg,ag,a])=>{
+    if(h!==name&&a!==name) return;
+    const me=h===name?hg:ag, op=h===name?ag:hg, opp=h===name?a:h;
+    gf+=me; ga+=op;
+    let r; if(me>op){w++;pts+=3;r="W";} else if(me<op){l++;r="L";} else {d++;pts++;r="D";}
+    results.push({opp,me,op,r});
+  });
+  FIXTURES[g].forEach(([h,a],i)=>{ if(h===name||a===name){ const [s0,s1]=fxScore(g,i,h,a); remaining.push({h,a,s0,s1}); } });
+  return {g,pts,gd:gf-ga,gf,ga,w,d,l,played:w+d+l,results,remaining};
+}
+
+function openTeam(name){
+  const st=teamStatuses()[name], c=teamCurrent(name);
+  const SL={through:["Qualified — top 2 secured","thru"],top3:["Top-3 secured","t3"],alive:["Still alive","alv"],out:["Eliminated","dead2"]}[st.status];
+  const resHtml=c.results.map(r=>`<div class="mrow"><span class="${r.r==='W'?'wn':r.r==='L'?'ls':'dr'}">${r.r}</span> v ${FLAG[r.opp]||''} ${r.opp} <b>${r.me}–${r.op}</b></div>`).join("") || `<div class="mrow dim">No games played yet</div>`;
+  const remHtml=c.remaining.map(r=>`<div class="mrow">${FLAG[r.h]||''} ${r.h} <b>${r.s0}–${r.s1}</b> ${r.a} ${FLAG[r.a]||''} <span class="dim">· projected</span></div>`).join("") || `<div class="mrow dim">All games played</div>`;
+  let scen=`<div class="mstat" style="font-size:13px">${scenarioText(st)}</div>`;
+  if(st.oneGame){
+    const nl=p=> p<=2?["qualify (top 2)","thru"] : p<=3?["reach top 3","t3"] : ["eliminated","dead2"];
+    const row=(k,lab)=>{ const [t,cl]=nl(st.wbr[k]); return `<div class="wdl"><span class="wk">${lab}</span><span class="qc ${cl}">${t}</span></div>`; };
+    scen=`<div class="wdlbox">${row('W','Win')}${row('D','Draw')}${row('L','Lose')}</div>`;
+  }
+  let mc=`<div class="msec dim">Run the Monte Carlo simulation (button up top) for advancement & title odds.</div>`;
+  if(mcGroups){ const m=mcGroups.tally[name],N=mcGroups.N,p=x=>100*x/N;
+    mc=`<div class="msec"><div class="mh">Simulation odds · ${N.toLocaleString()} runs</div><div class="mgrid">
+      <div><b>${p(m.wg).toFixed(0)}%</b><span>Win grp</span></div>
+      <div><b>${p(m.ko).toFixed(0)}%</b><span>Advance</span></div>
+      <div><b>${p(m.sf)<1?'<1':p(m.sf).toFixed(0)}%</b><span>Semis</span></div>
+      <div><b>${p(m.f)<1?'<1':p(m.f).toFixed(0)}%</b><span>Final</span></div>
+      <div><b>${p(m.t)<1?'<1':p(m.t).toFixed(0)}%</b><span>Title</span></div></div></div>`;
+  }
+  document.getElementById("modalCard").innerHTML=
+    `<div class="mtop"><div class="mtitle">${FLAG[name]||''} ${name}</div><button class="mx" id="mclose">✕</button></div>`+
+    `<div class="msub">Group ${st&&c.g} · strength ${strength(name)} · <span class="qc ${SL[1]}">${SL[0]}</span></div>`+
+    `<div class="msec"><div class="mh">After ${c.played} game${c.played!==1?'s':''}</div><div class="mstat">${c.pts} pts · ${c.w}W ${c.d}D ${c.l}L · GF ${c.gf} GA ${c.ga} · GD ${c.gd>0?'+':''}${c.gd}</div></div>`+
+    `<div class="msec"><div class="mh">Results</div>${resHtml}</div>`+
+    `<div class="msec"><div class="mh">Remaining</div>${remHtml}</div>`+
+    `<div class="msec"><div class="mh">Scenario</div>${scen}</div>`+
+    mc;
+  document.getElementById("modal").style.display="flex";
+  document.getElementById("mclose").onclick=closeModal;
+}
+function closeModal(){ document.getElementById("modal").style.display="none"; }
 
 function renderMC(res){
   const {tally,N}=res;
@@ -787,6 +864,8 @@ document.getElementById("footnote").innerHTML =
   `Use <b>🔗 Copy link</b> to share the exact scenario (modes + your overrides are saved in the URL); <b>🏟️ Host boost</b> adds a home‑tournament strength bump for the USA, Mexico and Canada.`;
 
 window.addEventListener("hashchange", ()=>{ mcGroups=null; applyHash(); render(); });
+document.getElementById("modal").addEventListener("click", e=>{ if(e.target.id==="modal") closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
 applyHash();
 render();
 </script>
