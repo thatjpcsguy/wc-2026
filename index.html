@@ -43,14 +43,18 @@
   .scard.gold .val{color:var(--gold)}
 
   /* Groups */
-  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
   .group{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
   .group h3{margin:0 0 8px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
   .group h3 span{color:var(--muted);font-weight:400;font-size:11px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th{color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;text-align:right;padding:2px 4px}
+  th{color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;text-align:right;padding:2px 3px}
   th.l,td.l{text-align:left}
-  td{padding:4px 4px;border-top:1px solid var(--panel2);text-align:right}
+  td{padding:4px 3px;border-top:1px solid var(--panel2);text-align:right}
+  /* group tables: fixed layout so the team name never gets squeezed into wrapping */
+  .group table{table-layout:fixed}
+  .group th:not(.l),.group td:not(.l){width:31px}
+  .group td.l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
   tr.adv td{font-weight:600}
   .pos{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;
     border-radius:4px;font-size:10px;margin-right:7px;font-weight:700;color:#04240f}
@@ -61,8 +65,8 @@
   .mcp{font-size:11px;color:var(--accent2)} .mcp.adv2{color:var(--accent);font-weight:600}
   tr.dead .tn{text-decoration:line-through;color:var(--muted)}
   tr.dead td{opacity:.6}
-  .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
-  .qc{font-size:8px;padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
+  .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 3px;border-radius:3px;margin-left:4px;font-weight:700;letter-spacing:.3px;vertical-align:middle}
+  .qc{font-size:8px;padding:1px 3px;border-radius:3px;margin-left:4px;font-weight:700;letter-spacing:.3px;vertical-align:middle}
   .qc.thru{background:rgba(25,195,125,.22);color:var(--accent)} .qc.t3{background:rgba(59,130,246,.22);color:var(--accent2)}
   .qc.alv{background:rgba(133,149,184,.2);color:var(--muted)} .qc.dead2{background:rgba(224,83,59,.22);color:var(--red)}
   tr[data-trow]{cursor:pointer} tr[data-trow]:hover td{background:var(--panel2)}
@@ -89,6 +93,7 @@
   .mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center}
   .mgrid div{background:var(--panel2);border-radius:8px;padding:8px 4px}
   .mgrid b{display:block;font-size:16px;color:#fff} .mgrid span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .atxt{font-size:13px;line-height:1.55;color:var(--txt)}
 
   /* Mobile */
   @media(max-width:640px){
@@ -171,7 +176,8 @@
     <button id="rand">🎲 Random tournament</button>
     <button id="share">🔗 Copy link</button>
     <button id="save">💾 Save scenario</button>
-    <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> for +1, or the score for 0–0</span>
+    <button id="about">ℹ️ How it works</button>
+    <span class="hint">Tip: click a <b>team</b> for details · click a <b>knockout match</b> to flip it · click a <b>fixture team</b> for +1, the score for 0–0</span>
   </div>
   <div class="scenbar" id="scenbar"></div>
   <div class="legend">
@@ -200,7 +206,6 @@
   <div class="bracket" id="bracket"></div>
   <div class="champ" id="champ"></div>
 
-  <div class="note" id="footnote"></div>
 </main>
 
 <div id="modal" class="modal-bg" style="display:none"><div class="modal-card" id="modalCard"></div></div>
@@ -997,18 +1002,21 @@ function applyHash(){
   }
 }
 
-document.getElementById("footnote").innerHTML =
-  `<b>How it works.</b> Group tables are built from the <b>real played scorelines</b> (in <code>PLAYED</code>) as of 24 Jun 2026. `+
-  `Most groups have one fixture left; <b>Groups K and L are a matchday behind</b>, so they have three games left to simulate. `+
-  `Every remaining group game and every knockout tie defaults to a win for the higher‑rated (favourite) team. `+
-  `The <b>“Scores”</b> toggle sets how remaining games are scored: <i>all 1–0</i> (minimal — the favourite wins by one) or <i>by strength</i>, a Poisson expected‑goals model where the rating gap sets each side's expected goals around the ~2.6/game World Cup average (≈1 goal of supremacy per 250 rating points) — so underdogs can score and only big mismatches give clean‑sheet blowouts. `+
-  `<b>Run simulations</b> replays the rest of the tournament thousands of times (real results fixed, remaining games drawn from that goal model, knockouts decided by a logistic win probability) to estimate each team's chance of winning the title or reaching each round — compare it against the bookmakers' implied chance in the “Mkt” column. `+
-  `Standings use the 2026 FIFA tiebreak chain — <b>head‑to‑head first</b>: points → <b>H2H points → H2H goal difference → H2H goals</b> → overall GD → overall goals → rating (new for 2026; earlier World Cups used overall GD before H2H). Any place decided by the head‑to‑head result is tagged <span class="h2h">H2H</span>. `+
-  `The eight best third‑placed teams are then slotted into the Round of 32 via FIFA's eligibility matrix (a valid constraint‑satisfying assignment; the official lookup may order ties differently). `+
-  `The <b>“Favourite”</b> toggle chooses what decides every remaining group game and knockout tie: my subjective ratings, or the <b>betting market</b> `+
-  `(outright title odds in <code>ODDS</code>, converted to implied probability and rescaled; unlisted longshots reuse their rating). In market mode the displayed number is that market strength. `+
-  `Ratings are approximate — edit the <code>GROUPS</code> or <code>ODDS</code> objects to change who's favoured. Click a team in any fixture for +1 goal, click a knockout match to flip it, or “Reset”. `+
-  `Use <b>🔗 Copy link</b> to share the exact scenario (modes + your overrides are saved in the URL); <b>🏟️ Host boost</b> adds a home‑tournament strength bump for the USA, Mexico and Canada.`;
+function openAbout(){
+  document.getElementById("modalCard").innerHTML =
+    `<div class="mtop"><div class="mtitle">How this works</div><button class="mx" id="mclose">✕</button></div>`+
+    `<div class="msub">A live model of the rest of the 2026 World Cup — favourites projected, everything editable.</div>`+
+    `<div class="msec"><div class="mh">Data</div><div class="atxt">Group tables are built from the <b>real played scorelines</b> as of 24 Jun 2026. Most groups have one game left; <b>Groups K & L are a matchday behind</b>, so they have more.</div></div>`+
+    `<div class="msec"><div class="mh">Projection</div><div class="atxt">Every remaining group game and knockout tie is won by the <b>favourite</b> (higher strength). The <b>Scores</b> toggle sets the margin: <i>all 1–0</i>, or an <b>expected-goals</b> model (Poisson; ~2.6 goals/game; ≈1 goal of supremacy per 250 rating points) so underdogs can score.</div></div>`+
+    `<div class="msec"><div class="mh">Tiebreakers — 2026 rules</div><div class="atxt">Points → <b>head-to-head</b> (pts, GD, goals among tied teams) → overall GD → overall goals → rating. <b>Head-to-head comes first</b> — new for 2026. Places decided that way are tagged <span class="h2h">H2H</span>.</div></div>`+
+    `<div class="msec"><div class="mh">Knockouts & 3rd places</div><div class="atxt">The official 2026 bracket (Round of 32 → Final). The <b>8 best third-placed teams</b> are ranked by points → GD → goals and slotted into the Round of 32 via FIFA's eligibility matrix.</div></div>`+
+    `<div class="msec"><div class="mh">Favourite source</div><div class="atxt">Toggle between my subjective <b>ratings</b> and the <b>betting market</b> (outright title odds → implied strength). Unlisted longshots keep their rating.</div></div>`+
+    `<div class="msec"><div class="mh">Simulations</div><div class="atxt"><b>Run 10,000×</b> replays the tournament with random results (goals from the model, knockouts by win probability) for each team's title & round odds, with a model-vs-market <b>edge</b> column. <b>Random tournament</b> rolls one outcome onto the board.</div></div>`+
+    `<div class="msec"><div class="mh">Make it yours</div><div class="atxt">Click a <b>team</b> for its scenario & path · click a fixture team for <b>+1</b> (right-click −1, the score for 0–0) · click a <b>knockout match</b> to flip it · <b>🔗 Copy link</b> and <b>💾 Save scenario</b> keep states · <b>🏟️ Host boost</b> for the hosts. Edit the <code>GROUPS</code> / <code>ODDS</code> objects to retune.</div></div>`;
+  document.getElementById("modal").style.display="flex";
+  document.getElementById("mclose").onclick=closeModal;
+}
+document.getElementById("about").onclick=openAbout;
 
 window.addEventListener("hashchange", ()=>{ mcGroups=null; applyHash(); render(); });
 document.getElementById("modal").addEventListener("click", e=>{ if(e.target.id==="modal") closeModal(); });
