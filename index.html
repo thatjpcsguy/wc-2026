@@ -457,14 +457,23 @@ function teamStatuses(){
 function eliminatedTeams(){ const s=teamStatuses(); const d=new Set(); for(const t in s) if(s[t].status==="out") d.add(t); return d; }
 
 const ORD=["","1st","2nd","3rd","4th"];
-function scenarioText(st){
-  if(st.status==="out") return "Eliminated — cannot finish in the top 3.";
-  let s = st.best===st.worst ? `Will finish ${ORD[st.best]}.` : `Can finish ${ORD[st.best]}–${ORD[st.worst]}.`;
-  if(st.status==="through") s = "Qualified — top-2 place secured. " + s;
-  else if(st.status==="top3") s = "Top-3 secured (alive for a best-third spot). " + s;
-  if(st.oneGame){ const nl=p=> p<=2?"qualify (top 2)" : p<=3?"reach the top 3" : "be eliminated";
-    s += `  Final game → win: ${nl(st.wbr.W)} · draw: ${nl(st.wbr.D)} · lose: ${nl(st.wbr.L)}.`; }
-  return s;
+// plain-English "what they need to do to advance"
+function advanceHeadline(st){
+  if(st.status==="through") return "✅ <b>Already through</b> to the Round of 32.";
+  if(st.status==="out")     return "❌ <b>Eliminated</b> — can’t finish in the top 3.";
+  const W=st.wbr.W, D=st.wbr.D;
+  if(st.status==="top3"){
+    return (st.oneGame && W<=2)
+      ? "Can’t be caught for the top 3. <b>Win to take a top-2 spot</b>; otherwise you’re in the best-third race."
+      : "<b>Guaranteed at least 3rd place</b> — alive for a best-third spot.";
+  }
+  if(!st.oneGame) return st.best<=2 ? "A top-2 finish is still in your hands — it comes down to the final round."
+                                    : "Still alive, but you’ll need other results to go your way.";
+  if(D<=2) return "<b>Win or draw to go through.</b> Lose and you’re out.";
+  if(W<=2) return D<=3 ? "<b>Win to go through.</b> A draw could still sneak you in as a best third-placed team; a loss is out."
+                       : "<b>Must win to go through.</b> A draw or loss and you’re out.";
+  if(W===3) return "<b>Win to stay alive</b> for a best-third place. A draw or loss eliminates you.";
+  return "❌ <b>Eliminated.</b>";
 }
 
 function bestThirds(tables){
@@ -603,7 +612,6 @@ function render(){
         mcCells=`<td class="mcp" title="Win group">${wg<1?'<1':Math.round(wg)}%</td><td class="mcp adv2" title="Advance to knockouts">${adv>99?'>99':adv<1?'<1':Math.round(adv)}%</td>`;
       }
       const st=stat[t.name]; const isDead=st.status==="out";
-      const tip=scenarioText(st);
       const chip = st.status==="through" ? `<span class="qc thru">✓</span>`
                  : st.status==="top3"    ? `<span class="qc t3">T3</span>`
                  : isDead                ? `<span class="out">OUT</span>` : "";
@@ -743,11 +751,35 @@ function openTeam(name){
   const SL={through:["Qualified — top 2 secured","thru"],top3:["Top-3 secured","t3"],alive:["Still alive","alv"],out:["Eliminated","dead2"]}[st.status];
   const resHtml=c.results.map(r=>`<div class="mrow"><span class="${r.r==='W'?'wn':r.r==='L'?'ls':'dr'}">${r.r}</span> v ${FLAG[r.opp]||''} ${r.opp} <b>${r.me}–${r.op}</b></div>`).join("") || `<div class="mrow dim">No games played yet</div>`;
   const remHtml=c.remaining.map(r=>`<div class="mrow">${FLAG[r.h]||''} ${r.h} <b>${r.s0}–${r.s1}</b> ${r.a} ${FLAG[r.a]||''} <span class="dim">· projected</span></div>`).join("") || `<div class="mrow dim">All games played</div>`;
-  let scen=`<div class="mstat" style="font-size:13px">${scenarioText(st)}</div>`;
+  let scen=`<div class="mstat" style="font-size:13px;line-height:1.5">${advanceHeadline(st)}</div>`;
   if(st.oneGame){
-    const nl=p=> p<=2?["qualify (top 2)","thru"] : p<=3?["reach top 3","t3"] : ["eliminated","dead2"];
-    const row=(k,lab)=>{ const [t,cl]=nl(st.wbr[k]); return `<div class="wdl"><span class="wk">${lab}</span><span class="qc ${cl}">${t}</span></div>`; };
-    scen=`<div class="wdlbox">${row('W','Win')}${row('D','Draw')}${row('L','Lose')}</div>`;
+    const lab=p=> p<=2?["Through ✅","thru"] : p<=3?["3rd place","t3"] : ["Out ❌","dead2"];
+    const row=(k,nm)=>{ const [t,cl]=lab(st.wbr[k]); return `<div class="wdl"><span class="wk">${nm}</span><span class="qc ${cl}">${t}</span></div>`; };
+    scen+=`<div class="wdlbox" style="margin-top:10px">${row('W','Win')}${row('D','Draw')}${row('L','Lose')}</div>`;
+  }
+  scen+=`<div class="mrow dim" style="margin-top:9px;font-size:11px">Top 2 in the group go through automatically · the 8 best 3rd-placed teams also advance.</div>`;
+
+  // If projected to finish 3rd, show the best-third race and the goal difference needed
+  const tablesP=computeGroups(), btP=bestThirds(tablesP), sgn=n=>(n>0?'+':'')+n, ordn=r=>r+(r===1?'st':r===2?'nd':r===3?'rd':'th');
+  let thirdSec="";
+  const p3=tablesP[c.g][2];
+  if(p3 && p3.name===name){
+    const r=btP.ranked, rank=r.findIndex(x=>x.name===name)+1, cut=r[7], out1=r[8];
+    let msg;
+    if(rank<=8){
+      const m = p3.pts>out1.pts ? `ahead of ${FLAG[out1.name]||''} ${out1.name} on points`
+              : (p3.pts===out1.pts && p3.gd!==out1.gd) ? `ahead of ${FLAG[out1.name]||''} ${out1.name} on goal difference (${sgn(p3.gd)} vs ${sgn(out1.gd)})`
+              : `narrowly ahead of ${FLAG[out1.name]||''} ${out1.name}`;
+      msg=`<b style="color:var(--accent)">Inside the top 8 — qualifying</b> as the ${ordn(rank)}-best 3rd, ${m}.`;
+    } else {
+      const need = p3.pts<cut.pts
+        ? `You're ${cut.pts-p3.pts} point(s) behind the cut-off (${FLAG[cut.name]||''} ${cut.name}, ${cut.pts} pts) — only a better result gets you up.`
+        : `Level on points with the cut-off (${FLAG[cut.name]||''} ${cut.name}, GD ${sgn(cut.gd)}). You'd need your goal difference up to <b>${sgn(cut.gd+1)}</b> to pass them — currently ${sgn(p3.gd)}.`;
+      msg=`<b style="color:var(--red)">Outside the top 8 (${ordn(rank)} of 12).</b> ${need}`;
+    }
+    thirdSec=`<div class="msec"><div class="mh">If you finish 3rd — best-third race</div>`+
+      `<div class="mstat" style="font-size:13px;line-height:1.5">Projected 3rd on ${p3.pts} pts, GD ${sgn(p3.gd)}. ${msg}</div>`+
+      `<div class="mrow dim" style="font-size:11px;margin-top:6px">8 of the 12 third-placed teams advance · based on current projected results.</div></div>`;
   }
   let mc=`<div class="msec dim">Run the Monte Carlo simulation (button up top) for advancement & title odds.</div>`;
   if(mcGroups){ const m=mcGroups.tally[name],N=mcGroups.N,p=x=>100*x/N;
@@ -764,7 +796,8 @@ function openTeam(name){
     `<div class="msec"><div class="mh">After ${c.played} game${c.played!==1?'s':''}</div><div class="mstat">${c.pts} pts · ${c.w}W ${c.d}D ${c.l}L · GF ${c.gf} GA ${c.ga} · GD ${c.gd>0?'+':''}${c.gd}</div></div>`+
     `<div class="msec"><div class="mh">Results</div>${resHtml}</div>`+
     `<div class="msec"><div class="mh">Remaining</div>${remHtml}</div>`+
-    `<div class="msec"><div class="mh">Scenario</div>${scen}</div>`+
+    `<div class="msec"><div class="mh">What they need to advance</div>${scen}</div>`+
+    thirdSec+
     mc;
   document.getElementById("modal").style.display="flex";
   document.getElementById("mclose").onclick=closeModal;
