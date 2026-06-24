@@ -48,6 +48,9 @@
   tr.dead .tn{text-decoration:line-through;color:var(--muted)}
   tr.dead td{opacity:.6}
   .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
+  .qc{font-size:8px;padding:1px 4px;border-radius:3px;margin-left:6px;font-weight:700;letter-spacing:.5px;vertical-align:middle}
+  .qc.thru{background:rgba(25,195,125,.22);color:var(--accent)} .qc.t3{background:rgba(59,130,246,.22);color:var(--accent2)}
+  .group td.l[title]{cursor:help}
   .h2h{font-size:8px;background:rgba(224,138,43,.22);color:var(--amber);padding:1px 4px;
     border-radius:3px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;font-weight:700}
   .fixtures{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
@@ -123,6 +126,7 @@
     <span><span class="pos t" style="vertical-align:middle"> </span><b>3rd — qualifies</b></span>
     <span><span class="pos t out" style="vertical-align:middle"> </span><b>3rd — eliminated</b></span>
     <span>Number after a team = <b>strength</b> (my rating, or market‑implied when betting mode is on). Higher = favourite.</span>
+    <span>Hover a team for its <b>qualification scenario</b> · <span class="qc thru">✓</span> top‑2 secured · <span class="qc t3">T3</span> top‑3 secured · <span class="out">OUT</span> eliminated</span>
   </div>
 </header>
 <main>
@@ -381,14 +385,15 @@ function computeGroups(){
   return tables;
 }
 
-// Mathematically eliminated = cannot finish in the top 3 of its group under ANY combination of
-// remaining results (only the top 3 can ever advance). We enumerate every outcome of the still-open
-// games and apply the real tiebreakers: head-to-head is fixed by results already played, so a team
-// that lost the head-to-head can't escape a points tie. Goal-difference ties are resolved in the
-// team's favour (best case), so a team is only flagged when truly dead — never a false positive.
+// Per-team qualification scenarios from the remaining games, using the real 2026 tiebreakers.
+// We enumerate every outcome of the still-open group games; head-to-head is fixed by results
+// already played, and goal-difference ties are resolved both for and against the team to get its
+// best AND worst possible finishing position. Only the top 3 can ever advance, so:
+//   through = top-2 guaranteed · top3 = top-3 guaranteed · alive = could still go either way · out = can't reach top 3
+// For a team with exactly one game left we also record what each result (W/D/L) would secure.
 // "Decided" games = real results (PLAYED) plus any scoreline you've clicked in (fxOverride).
-function eliminatedTeams(){
-  const dead=new Set();
+function teamStatuses(){
+  const info={};
   for(const g in GROUPS){
     const teams=GROUPS[g].map(x=>x[0]);
     const decided=[], open=[];
@@ -400,22 +405,40 @@ function eliminatedTeams(){
     });
     const K=open.length, combos=3**K;
     for(const T of teams){
-      let canReachTop3=false;
-      for(let mask=0; mask<combos && !canReachTop3; mask++){
-        const pts={}, beat={};
-        teams.forEach(t=>{ pts[t]=0; beat[t]={}; });
+      const oneGame = open.filter(([h,a])=>h===T||a===T).length===1;
+      const tg = open.findIndex(([h,a])=>h===T||a===T);
+      let best=4, worst=1; const wbr={W:1,D:1,L:1};
+      for(let mask=0; mask<combos; mask++){
+        const pts={}, beat={}; teams.forEach(t=>{ pts[t]=0; beat[t]={}; });
         const apply=(h,a,r)=>{ if(r>0){pts[h]+=3;beat[h][a]=1;} else if(r<0){pts[a]+=3;beat[a][h]=1;} else {pts[h]++;pts[a]++;} };
         decided.forEach(([h,a,r])=> apply(h,a,r));
-        let mm=mask;
-        for(let j=0;j<K;j++){ const r=(mm%3)-1; mm=(mm/3)|0; apply(open[j][0],open[j][1],r); }
-        let above=0;                                   // teams certainly finishing above T
-        for(const O of teams) if(O!==T && (pts[O]>pts[T] || (pts[O]===pts[T] && beat[O][T]))) above++;
-        if(above<3) canReachTop3=true;                 // some scenario leaves T in the top 3
+        let mm=mask; const res=[];
+        for(let j=0;j<K;j++){ const r=(mm%3)-1; mm=(mm/3)|0; apply(open[j][0],open[j][1],r); res.push(r); }
+        let ab=0, apn=0;                                // teams above T — best case (ab) and worst case (apn)
+        for(const O of teams){ if(O===T) continue;
+          if(pts[O]>pts[T] || (pts[O]===pts[T] && beat[O][T]))  ab++;
+          if(pts[O]>pts[T] || (pts[O]===pts[T] && !beat[T][O])) apn++;
+        }
+        best=Math.min(best,ab+1); worst=Math.max(worst,apn+1);
+        if(oneGame){ const tw=open[tg][0]===T?res[tg]:-res[tg]; const k=tw>0?"W":tw<0?"L":"D"; wbr[k]=Math.max(wbr[k],apn+1); }
       }
-      if(!canReachTop3) dead.add(T);
+      info[T]={ best, worst, oneGame, wbr,
+        status: best>=4?"out" : worst<=2?"through" : worst<=3?"top3" : "alive" };
     }
   }
-  return dead;
+  return info;
+}
+function eliminatedTeams(){ const s=teamStatuses(); const d=new Set(); for(const t in s) if(s[t].status==="out") d.add(t); return d; }
+
+const ORD=["","1st","2nd","3rd","4th"];
+function scenarioText(st){
+  if(st.status==="out") return "Eliminated — cannot finish in the top 3.";
+  let s = st.best===st.worst ? `Will finish ${ORD[st.best]}.` : `Can finish ${ORD[st.best]}–${ORD[st.worst]}.`;
+  if(st.status==="through") s = "Qualified — top-2 place secured. " + s;
+  else if(st.status==="top3") s = "Top-3 secured (alive for a best-third spot). " + s;
+  if(st.oneGame){ const nl=p=> p<=2?"qualify (top 2)" : p<=3?"reach the top 3" : "be eliminated";
+    s += `  Final game → win: ${nl(st.wbr.W)} · draw: ${nl(st.wbr.D)} · lose: ${nl(st.wbr.L)}.`; }
+  return s;
 }
 
 function bestThirds(tables){
@@ -539,7 +562,7 @@ function render(){
   // ----- groups -----
   const posCls=["w","r","t","x"];
   const posTxt=["1","2","3","4"];
-  const dead=eliminatedTeams();
+  const stat=teamStatuses();
   let gh="";
   for(const g of Object.keys(GROUPS)){
     const arr=tables[g];
@@ -553,9 +576,13 @@ function render(){
         const wg=100*m.wg/N, adv=100*m.ko/N;
         mcCells=`<td class="mcp" title="Win group">${wg<1?'<1':Math.round(wg)}%</td><td class="mcp adv2" title="Advance to knockouts">${adv>99?'>99':adv<1?'<1':Math.round(adv)}%</td>`;
       }
-      const isDead=dead.has(t.name);
+      const st=stat[t.name]; const isDead=st.status==="out";
+      const tip=scenarioText(st);
+      const chip = st.status==="through" ? `<span class="qc thru">✓</span>`
+                 : st.status==="top3"    ? `<span class="qc t3">T3</span>`
+                 : isDead                ? `<span class="out">OUT</span>` : "";
       rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}">
-        <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${isDead?'<span class="out" title="Mathematically eliminated — cannot finish in the top 3">OUT</span>':''}</td>
+        <td class="l" title="${tip}"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
         <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
     });
     let fx="";
