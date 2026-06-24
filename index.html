@@ -71,6 +71,7 @@
   .out{font-size:8px;background:rgba(224,83,59,.25);color:var(--red);padding:1px 3px;border-radius:3px;margin-left:4px;font-weight:700;letter-spacing:.3px;vertical-align:middle}
   .qc{font-size:8px;padding:1px 3px;border-radius:3px;margin-left:4px;font-weight:700;letter-spacing:.3px;vertical-align:middle}
   .qc.thru{background:rgba(25,195,125,.22);color:var(--accent)} .qc.t3{background:rgba(59,130,246,.22);color:var(--accent2)}
+  .qc.t3q{background:rgba(224,138,43,.25);color:var(--amber)} .qc.t3x{background:rgba(133,149,184,.18);color:var(--muted)}
   .qc.alv{background:rgba(133,149,184,.2);color:var(--muted)} .qc.dead2{background:rgba(224,83,59,.22);color:var(--red)}
   tr[data-trow]{cursor:pointer} tr[data-trow]:hover td{background:var(--panel2)}
 
@@ -191,7 +192,7 @@
     <span><span class="pos t" style="vertical-align:middle"> </span><b>3rd — qualifies</b></span>
     <span><span class="pos t out" style="vertical-align:middle"> </span><b>3rd — eliminated</b></span>
     <span>Number after a team = <b>strength</b> (my rating, or market‑implied when betting mode is on). Higher = favourite.</span>
-    <span>Click a team for its <b>qualification scenario</b> · <span class="qc thru">✓ in</span> qualified · <span class="qc t3">≥3rd</span> can't be eliminated · <span class="out">OUT</span> eliminated</span>
+    <span>Click a team for its <b>qualification scenario</b> · <span class="qc thru">✓ in</span> qualified · <span class="qc t3q">3rd ✓</span> best‑3rd advancing · <span class="qc t3x">3rd ✗</span> 3rd, out · <span class="out">OUT</span> eliminated</span>
   </div>
 </header>
 <main>
@@ -726,9 +727,13 @@ function render(){
         mcCells=`<td class="mcp" title="Win group">${wg<1?'<1':Math.round(wg)}%</td><td class="mcp adv2" title="Advance to knockouts">${adv>99?'>99':adv<1?'<1':Math.round(adv)}%</td>`;
       }
       const st=stat[t.name]; const isDead=st.status==="out";
-      const chip = st.status==="through" ? `<span class="qc thru" title="Qualified — top 2 secured">✓ in</span>`
-                 : st.status==="top3"    ? `<span class="qc t3" title="Guaranteed at least 3rd — can't be eliminated">≥3rd</span>`
-                 : isDead                ? `<span class="out">OUT</span>` : "";
+      let chip;
+      if(st.status==="through")      chip=`<span class="qc thru" title="Qualified — top 2 secured">✓ in</span>`;
+      else if(isDead)                chip=`<span class="out" title="Eliminated — can't reach the top 3">OUT</span>`;
+      else if(i===2)                 chip = qualSet.has(g)
+        ? `<span class="qc t3q" title="3rd place — currently among the 8 best third-placed teams (advancing)">3rd ✓</span>`
+        : `<span class="qc t3x" title="3rd place — currently outside the best 8 third-placed teams (would not advance)">3rd ✗</span>`;
+      else                           chip="";
       rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}" data-trow="${t.name}" title="Click for details">
         <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
         <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
