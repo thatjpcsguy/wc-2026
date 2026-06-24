@@ -151,6 +151,7 @@
     border:1px solid var(--gold);border-radius:12px;padding:18px}
   .champ .lbl{color:var(--gold);text-transform:uppercase;letter-spacing:2px;font-size:12px}
   .champ .team{font-size:30px;font-weight:800;margin-top:6px}
+  .champ .csub{color:var(--muted);font-size:13px;margin-top:6px}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 0}
   .legend b{color:var(--txt);font-weight:600}
   .note{font-size:12px;color:var(--muted);max-width:900px;margin-top:8px}
@@ -640,7 +641,11 @@ function render(){
     let through=0, contention=0, out=0;
     for(const t in stat){ const s=stat[t].status; if(s==="through")through++; else if(s==="out")out++; else contention++; }
     const cards=[];
-    cards.push(`<div class="scard gold"><div class="lab">Projected champion</div><div class="val">${FLAG[champ]||""} ${champ||"—"}</div>${mcGroups&&champ?`<div class="sub">${(100*mcGroups.tally[champ].t/mcGroups.N).toFixed(0)}% across simulations</div>`:`<div class="sub">favourite wins every tie</div>`}</div>`);
+    const edits=Object.keys(fxOverride).length+Object.keys(koOverride).length;
+    const basis = mcGroups&&champ ? `${(100*mcGroups.tally[champ].t/mcGroups.N).toFixed(0)}% across simulations`
+      : edits>10 ? "from this scenario" : edits>0 ? "with your edits"
+      : oddsMode ? "market favourite wins out" : "favourite wins every tie";
+    cards.push(`<div class="scard gold"><div class="lab">Projected champion</div><div class="val">${FLAG[champ]||""} ${champ||"—"}</div><div class="sub">${basis}</div></div>`);
     cards.push(`<div class="scard"><div class="lab">Other finalist</div><div class="val">${FLAG[other]||""} ${other||"—"}</div><div class="sub">loses the final to the champion</div></div>`);
     cards.push(`<div class="scard"><div class="lab">Qualified · alive · out</div><div class="val">${through} · ${contention} · ${out}</div><div class="sub">of 48 teams</div></div>`);
     if(mcGroups){
@@ -732,8 +737,10 @@ function render(){
     hostBoost ? "🏟️ Host boost: on" : "🏟️ Host boost: off";
   history.replaceState(null, "", location.pathname + location.search + stateToHash());
 
+  const cother = R.winner(101)===champ ? R.winner(102) : R.winner(101);
+  const ctp = mcGroups&&champ ? ` · ${(100*mcGroups.tally[champ].t/mcGroups.N).toFixed(0)}% in simulations` : "";
   document.getElementById("champ").innerHTML = champ
-    ? `<div class="lbl">Projected Champion</div><div class="team">${FLAG[champ]||""} ${champ}</div>`
+    ? `<div class="lbl">Projected Champion</div><div class="team">${FLAG[champ]||""} ${champ}</div><div class="csub">defeats ${FLAG[cother]||""} ${cother||"—"} in the final${ctp}</div>`
     : `<div class="lbl">Champion</div><div class="team" style="color:#475068">— TBD —</div>`;
 
   attachEvents();
