@@ -166,6 +166,7 @@
     <button id="omode"></button>
     <button id="hmode"></button>
     <button id="mc">🎲 Run 10,000 simulations</button>
+    <button id="rand">🎲 Random tournament</button>
     <button id="share">🔗 Copy link</button>
     <button id="save">💾 Save scenario</button>
     <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> for +1, or the score for 0–0</span>
@@ -177,7 +178,7 @@
     <span><span class="pos t" style="vertical-align:middle"> </span><b>3rd — qualifies</b></span>
     <span><span class="pos t out" style="vertical-align:middle"> </span><b>3rd — eliminated</b></span>
     <span>Number after a team = <b>strength</b> (my rating, or market‑implied when betting mode is on). Higher = favourite.</span>
-    <span>Hover a team for its <b>qualification scenario</b> · <span class="qc thru">✓</span> top‑2 secured · <span class="qc t3">T3</span> top‑3 secured · <span class="out">OUT</span> eliminated</span>
+    <span>Click a team for its <b>qualification scenario</b> · <span class="qc thru">✓ in</span> qualified · <span class="qc t3">≥3rd</span> can't be eliminated · <span class="out">OUT</span> eliminated</span>
   </div>
 </header>
 <main>
@@ -664,8 +665,8 @@ function render(){
         mcCells=`<td class="mcp" title="Win group">${wg<1?'<1':Math.round(wg)}%</td><td class="mcp adv2" title="Advance to knockouts">${adv>99?'>99':adv<1?'<1':Math.round(adv)}%</td>`;
       }
       const st=stat[t.name]; const isDead=st.status==="out";
-      const chip = st.status==="through" ? `<span class="qc thru">✓</span>`
-                 : st.status==="top3"    ? `<span class="qc t3">T3</span>`
+      const chip = st.status==="through" ? `<span class="qc thru" title="Qualified — top 2 secured">✓ in</span>`
+                 : st.status==="top3"    ? `<span class="qc t3" title="Guaranteed at least 3rd — can't be eliminated">≥3rd</span>`
                  : isDead                ? `<span class="out">OUT</span>` : "";
       rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}" data-trow="${t.name}" title="Click for details">
         <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
@@ -856,6 +857,20 @@ function openTeam(name){
 }
 function closeModal(){ document.getElementById("modal").style.display="none"; }
 
+// Roll one probabilistic tournament and write it into the board as overrides (a plausible alternate reality)
+function randomFill(){
+  fxOverride={}; koOverride={};
+  for(const g in GROUPS) FIXTURES[g].forEach(([h,a],i)=>{ fxOverride[g+i]=sampleScore(h,a); });
+  const tables=computeGroups(), {assign}=bestThirds(tables), cache={};
+  const ref=(o)=> o.w!==undefined?tables[o.w][0].name : o.ru!==undefined?tables[o.ru][1].name
+              : o.th!==undefined?(assign[o.th]?tables[assign[o.th]][2].name:null) : win(o.win);
+  function win(m){ if(cache[m]!==undefined)return cache[m]; const M=KO[m],pa=ref(M.a),pb=ref(M.b);
+    let w=(!pa&&!pb)?null:!pa?pb:!pb?pa:(Math.random()<pWin(pa,pb)?pa:pb);
+    cache[m]=w; if(pa&&pb&&w) koOverride[m]=w; return w; }
+  for(let m=73;m<=104;m++) if(KO[m]) win(m);
+  mcGroups=null; render();
+}
+
 function renderMC(res){
   const {tally,N}=res;
   const dead=eliminatedTeams();
@@ -889,6 +904,7 @@ function renderMC(res){
     `<th>Final</th><th>Semi</th><th>Reach KO</th><th class="l">Mkt</th><th>Edge</th></tr>${rows}</table>`;
 }
 
+document.getElementById("rand").onclick=()=>randomFill();
 document.getElementById("mc").onclick=()=>{
   const btn=document.getElementById("mc");
   btn.textContent="Running…"; btn.disabled=true;
