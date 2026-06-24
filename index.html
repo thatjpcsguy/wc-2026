@@ -115,7 +115,7 @@
     <button id="hmode"></button>
     <button id="mc">🎲 Run 10,000 simulations</button>
     <button id="share">🔗 Copy link</button>
-    <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> to add a goal in their favour (click the score to reset)</span>
+    <span class="hint">Tip: click a <b>knockout match</b> to flip the winner · click a <b>team in a group fixture</b> for +1, or the score for 0–0</span>
   </div>
   <div class="legend">
     <span><span class="pos w" style="vertical-align:middle"> </span><b>Group winner</b></span>
@@ -248,10 +248,12 @@ const KO = {
  101:{a:{win:97},b:{win:98}},102:{a:{win:99},b:{win:100}},
  104:{a:{win:101},b:{win:102}}
 };
+// Display order chosen so the bracket nests as a clean tree (each match sits directly
+// after the two it feeds from) — top half = matches feeding SF 101, bottom half = SF 102.
 const ROUNDS = [
- {name:"Round of 32", ms:[74,77,73,75,76,78,79,80,83,84,81,82,86,88,85,87]},
- {name:"Round of 16", ms:[89,90,91,92,93,94,95,96]},
- {name:"Quarter‑finals", ms:[97,99,98,100]},
+ {name:"Round of 32", ms:[74,77,73,75,83,84,81,82,76,78,79,80,86,88,85,87]},
+ {name:"Round of 16", ms:[89,90,93,94,91,92,95,96]},
+ {name:"Quarter‑finals", ms:[97,98,99,100]},
  {name:"Semi‑finals", ms:[101,102]},
  {name:"Final", ms:[104]}
 ];
@@ -562,12 +564,12 @@ function render(){
       const rc = hs>as?"h":hs<as?"a":"d";
       fx+=`<div class="fx">
         <span class="home ${hs>as?"wn h":""}" data-fx="${g+i}" data-dir="h" title="Click: +1 goal for ${h}">${FLAG[h]} ${h}</span>
-        <span class="score ${rc}" data-fx="${g+i}" data-dir="r" title="Click to reset to the projected score">${hs}–${as}</span>
+        <span class="score ${rc}" data-fx="${g+i}" data-dir="r" title="Click for 0–0 · click again to restore the projected score">${hs}–${as}</span>
         <span class="away ${hs<as?"wn a":""}" data-fx="${g+i}" data-dir="a" title="Click: +1 goal for ${a}">${a} ${FLAG[a]}</span></div>`;
     });
     gh+=`<div class="group"><h3>Group ${g}</h3>
       <table><tr><th class="l">Team</th><th>Rtg</th><th>Pts</th><th>GD</th>${mcGroups?'<th title="Win group">Win</th><th title="Advance to knockouts">Adv</th>':''}</tr>${rows}</table>
-      <div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games (click a team for +1 goal)</div>${fx}</div>
+      <div class="fixtures"><div class="hint" style="margin-bottom:4px">Remaining games · click a team for +1, click the score for 0–0</div>${fx}</div>
     </div>`;
   }
   document.getElementById("groups").innerHTML=gh;
@@ -638,9 +640,24 @@ function attachEvents(){
       const g=id.slice(0,1), i=+id.slice(1);
       const [h,a]=FIXTURES[g][i];
       mcGroups=null;                                              // scenario changed → drop stale sim probabilities
-      if(dir==="r"){ delete fxOverride[id]; render(); return; }   // reset to projected score
+      if(dir==="r"){                                              // score box: toggle 0–0 ⇄ projected score
+        const c=fxOverride[id];
+        if(c && c[0]===0 && c[1]===0) delete fxOverride[id];
+        else fxOverride[id]=[0,0];
+        render(); return;
+      }
       let [gh,ga]=(id in fxOverride)?fxOverride[id]:strengthScore(h,a);
       if(dir==="h") gh=Math.min(gh+1,15); else ga=Math.min(ga+1,15);  // the clicked team scores
+      fxOverride[id]=[gh,ga];
+      render();
+    };
+    if(el.dataset.dir!=="r") el.oncontextmenu=(e)=>{               // right-click a team: subtract a goal
+      e.preventDefault();
+      const id=el.dataset.fx, dir=el.dataset.dir, g=id.slice(0,1), i=+id.slice(1);
+      const [h,a]=FIXTURES[g][i];
+      mcGroups=null;
+      let [gh,ga]=(id in fxOverride)?fxOverride[id]:strengthScore(h,a);
+      if(dir==="h") gh=Math.max(gh-1,0); else ga=Math.max(ga-1,0);
       fxOverride[id]=[gh,ga];
       render();
     };
