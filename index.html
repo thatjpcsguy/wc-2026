@@ -147,6 +147,8 @@
   .tie.path{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
   .tie .mno{font-size:9px;color:#475068;padding:2px 8px 0}
   .slot .rgt{display:flex;align-items:center;gap:7px}
+  .slot.spec .nm{font-style:italic;opacity:.6}
+  .lockmk{font-size:9px;margin-right:4px;opacity:.85}
   .wp{font-size:9px;color:var(--accent);font-weight:600}
   .slot{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;cursor:pointer;
     border-top:1px solid var(--panel2)}
@@ -209,6 +211,7 @@
   <div id="mcout"><div class="hint">Runs thousands of randomised tournaments (real results kept fixed; remaining games by the expected‑goals model; knockouts by win probability) using the <b>currently selected favourite source</b>. Click <b>Run 10,000 simulations</b> above.</div></div>
 
   <h2>Knockout Bracket — Round of 32 → Final</h2>
+  <div class="hint" style="margin:-6px 0 10px">🔒 confirmed (mathematically locked into the slot) · <i>italic</i> = projected. Third-place slots stay projected until every group finishes.</div>
   <div class="bracket" id="bracket"></div>
   <div class="champ" id="champ"></div>
 
@@ -780,14 +783,26 @@ function render(){
   const champ=R.winner(104);
   const champPath=new Set();                       // matches the projected champion wins, for highlighting
   if(champ) for(const round of ROUNDS) for(const m of round.ms) if(R.winner(m)===champ) champPath.add(m);
+  // a slot is "locked" only if its team is mathematically certain of that exact spot:
+  // winner slot → guaranteed 1st; runner-up slot → guaranteed 2nd; 3rd-place slot → only once every
+  // group is finished (the best-8 allocation isn't fixed until then); knockout winners are never locked.
+  const allDone = Object.keys(GROUPS).every(g=>FIXTURES[g].length===0);
+  const refLocked = (o)=>{
+    if(!o) return false;
+    if(o.w!==undefined){ const s=stat[tables[o.w][0].name]; return s.best===1 && s.worst===1; }
+    if(o.ru!==undefined){ const s=stat[tables[o.ru][1].name]; return s.best===2 && s.worst===2; }
+    if(o.th!==undefined) return allDone;
+    return false;
+  };
   let bh="";
   for(const round of ROUNDS){
     let col=`<div class="round"><h4>${round.name}<span class="rdate">${round.date||""}</span></h4><div class="ties">`;
     for(const m of round.ms){
       const [pa,pb]=R.participants(m);
       const w=R.winner(m);
+      const la=refLocked(KO[m].a), lb=refLocked(KO[m].b);
       col+=`<div class="tie ${champPath.has(m)?'path':''}"><div class="mno">Match ${m}</div>
-        ${slotHTML(m,pa,pb,w)}${slotHTML(m,pb,pa,w)}</div>`;
+        ${slotHTML(m,pa,pb,w,la)}${slotHTML(m,pb,pa,w,lb)}</div>`;
     }
     col+="</div></div>"; bh+=col;
   }
@@ -810,12 +825,13 @@ function render(){
   attachEvents();
 }
 
-function slotHTML(m,team,opp,w){
+function slotHTML(m,team,opp,w,locked){
   if(!team) return `<div class="slot empty"><span class="nm">— TBD —</span></div>`;
   const isW = team===w;
   const wp = opp ? Math.round(pWin(team,opp)*100) : null;
-  return `<div class="slot ${isW?'win':''}" data-ko="${m}" data-team="${team}">
-    <span class="nm"><span class="flag">${FLAG[team]||""}</span>${team}</span>
+  const lockMark = locked ? `<span class="lockmk" title="Confirmed — mathematically locked into this slot">🔒</span>` : "";
+  return `<div class="slot ${isW?'win':''} ${locked?'':'spec'}" data-ko="${m}" data-team="${team}">
+    <span class="nm">${lockMark}<span class="flag">${FLAG[team]||""}</span>${team}</span>
     <span class="rgt">${wp!==null?`<span class="wp" title="Win probability for this tie">${wp}%</span>`:''}<span class="rt">${strength(team)}</span></span></div>`;
 }
 
