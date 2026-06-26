@@ -134,6 +134,7 @@
   .thirds tr.cut td{text-align:center;color:var(--amber);font-size:10px;letter-spacing:1.5px;padding:5px;
     background:repeating-linear-gradient(90deg,transparent,transparent 7px,rgba(224,138,43,.14) 7px,rgba(224,138,43,.14) 14px)}
   .thirds .rk{color:var(--muted)}
+  .thirds tr.proj .tname{font-style:italic;opacity:.65}
   .pbar{display:inline-block;height:9px;border-radius:2px;background:var(--accent2);margin-right:7px;vertical-align:middle;min-width:2px}
 
   /* Bracket */
@@ -205,6 +206,7 @@
   <div class="groups" id="groups"></div>
 
   <h2>Best Third‑Placed Teams — 8 of 12 qualify</h2>
+  <div class="hint" style="margin:-6px 0 10px">🔒 = group finished, so this 3rd-placed team is confirmed · <i>italic</i> = projected (group still in progress). The qualifying 8 aren't final until every group ends.</div>
   <div id="thirds"></div>
 
   <h2>Monte Carlo — title &amp; round probabilities</h2>
@@ -766,10 +768,11 @@ function render(){
   let tr="";
   ranked.forEach((t,idx)=>{
     const q=idx<8;
-    tr+=`<tr class="${q?'q':'o'}">
+    const locked = FIXTURES[t.g].length===0;   // group finished → this 3rd-placed team is confirmed
+    tr+=`<tr class="${q?'q':'o'} ${locked?'':'proj'}">
       <td class="rk">${idx+1}</td>
       <td class="l">Group ${t.g}</td>
-      <td class="l">${FLAG[t.name]||""} ${t.name}</td>
+      <td class="l tname">${locked?'<span class="lockmk" title="Group finished — this 3rd-placed team is confirmed">🔒</span>':''}${FLAG[t.name]||""} ${t.name}</td>
       <td>${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>
       <td class="l st">${q?('✓ qualifies → Match '+slotOf[t.g]):'✗ eliminated'}</td></tr>`;
     if(idx===7) tr+=`<tr class="cut"><td colspan="7">QUALIFICATION CUT‑OFF · TOP 8 ADVANCE</td></tr>`;
