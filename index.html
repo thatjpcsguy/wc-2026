@@ -135,6 +135,7 @@
     background:repeating-linear-gradient(90deg,transparent,transparent 7px,rgba(224,138,43,.14) 7px,rgba(224,138,43,.14) 14px)}
   .thirds .rk{color:var(--muted)}
   .thirds tr.proj .tname{font-style:italic;opacity:.65}
+  .thirds .proj-s{color:var(--muted)}
   .pbar{display:inline-block;height:9px;border-radius:2px;background:var(--accent2);margin-right:7px;vertical-align:middle;min-width:2px}
 
   /* Bracket */
@@ -206,7 +207,7 @@
   <div class="groups" id="groups"></div>
 
   <h2>Best Third‑Placed Teams — 8 of 12 qualify</h2>
-  <div class="hint" style="margin:-6px 0 10px">🔒 = group finished, so this 3rd-placed team is confirmed · <i>italic</i> = projected (group still in progress). The qualifying 8 aren't final until every group ends.</div>
+  <div class="hint" style="margin:-6px 0 10px">🔒 = confirmed 3rd-placed team (group finished) · <i>italic</i> = projected. Status shows <b style="color:var(--accent)">Qualified/Eliminated — locked</b> once a team is <i>mathematically</i> in or out of the top 8 (no scenario can change it); otherwise it's a projection.</div>
   <div id="thirds"></div>
 
   <h2>Monte Carlo — title &amp; round probabilities</h2>
@@ -590,6 +591,33 @@ function bestThirds(tables){
   return {assign, qualSet, ranked:thirds};
 }
 
+// Range of points the 3rd-placed team of an (unfinished) group could end on, over all remaining results.
+function thirdPtsRange(g){
+  const teams=GROUPS[g].map(x=>x[0]); const base={}; teams.forEach(n=>base[n]=0);
+  PLAYED[g].forEach(([h,hg,ag,a])=>{ if(hg>ag)base[h]+=3; else if(ag>hg)base[a]+=3; else {base[h]++;base[a]++;} });
+  const open=FIXTURES[g], K=open.length; let mx=-1, mn=99;
+  for(let mask=0;mask<3**K;mask++){ const p={...base}; let mm=mask;
+    for(let j=0;j<K;j++){ const r=(mm%3)-1; mm=(mm/3)|0; const [h,a]=open[j]; if(r>0)p[h]+=3; else if(r<0)p[a]+=3; else {p[h]++;p[a]++;} }
+    const s=Object.values(p).sort((x,y)=>y-x); mx=Math.max(mx,s[2]); mn=Math.min(mn,s[2]); }
+  return {maxPts:mx, minPts:mn};
+}
+// Mathematical best-third status for the CONFIRMED thirds (finished groups): in / out / contested.
+// Groups are independent so the max # of thirds that can sit above X is exact.
+function thirdMathStatus(ranked){
+  const conf=[], unf=[];
+  for(const t of ranked){ if(FIXTURES[t.g].length===0) conf.push(t); else unf.push(thirdPtsRange(t.g)); }
+  const ge=(Y,X)=> Y.pts>X.pts || (Y.pts===X.pts && (Y.gd>X.gd || (Y.gd===X.gd && Y.gf>=X.gf)));  // Y could be ≥ X
+  const gt=(Y,X)=> Y.pts>X.pts || (Y.pts===X.pts && (Y.gd>X.gd || (Y.gd===X.gd && Y.gf>X.gf)));   // Y strictly > X
+  const res={};
+  for(const X of conf){
+    let maxAbove=0, minAbove=0;
+    for(const Y of conf){ if(Y.name===X.name) continue; if(ge(Y,X))maxAbove++; if(gt(Y,X))minAbove++; }
+    for(const u of unf){ if(u.maxPts>=X.pts)maxAbove++; if(u.minPts>X.pts)minAbove++; }
+    res[X.name] = maxAbove<=7 ? "in" : minAbove>=8 ? "out" : "contested";
+  }
+  return res;
+}
+
 function buildResolver(tables, thirdAssign){
   const memo={};
   function ref(o){
@@ -766,15 +794,21 @@ function render(){
   // ----- best third-placed teams -----
   const slotOf={}; for(const m in thirdAssign) slotOf[thirdAssign[m]]=m;
   let tr="";
+  const tms=thirdMathStatus(ranked);
   ranked.forEach((t,idx)=>{
     const q=idx<8;
     const locked = FIXTURES[t.g].length===0;   // group finished → this 3rd-placed team is confirmed
+    const ms = locked ? tms[t.name] : "contested";
+    const status = ms==="in"  ? `<b style="color:var(--accent)">✅ Qualified — locked</b>`
+                 : ms==="out" ? `<b style="color:var(--red)">❌ Eliminated — locked</b>`
+                 : q ? `<span class="proj-s">✓ projected → Match ${slotOf[t.g]}</span>`
+                     : `<span class="proj-s">✗ projected out</span>`;
     tr+=`<tr class="${q?'q':'o'} ${locked?'':'proj'}">
       <td class="rk">${idx+1}</td>
       <td class="l">Group ${t.g}</td>
       <td class="l tname">${locked?'<span class="lockmk" title="Group finished — this 3rd-placed team is confirmed">🔒</span>':''}${FLAG[t.name]||""} ${t.name}</td>
       <td>${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>
-      <td class="l st">${q?('✓ qualifies → Match '+slotOf[t.g]):'✗ eliminated'}</td></tr>`;
+      <td class="l st">${status}</td></tr>`;
     if(idx===7) tr+=`<tr class="cut"><td colspan="7">QUALIFICATION CUT‑OFF · TOP 8 ADVANCE</td></tr>`;
   });
   document.getElementById("thirds").innerHTML=
