@@ -301,11 +301,6 @@ const PLAYED = {
  L:[["England",4,2,"Croatia"],["Ghana",1,0,"Panama"],["England",0,0,"Ghana"],["Panama",0,1,"Croatia"],["Panama",0,2,"England"],["Croatia",2,1,"Ghana"]]
 };
 
-// Completed knockout results — winner keyed by match number (same numbering as KO below).
-const KO_PLAYED = {
-  73: "Canada",   // South Africa 0–1 Canada (Jun 28, Round of 32)
-};
-
 // Outright "to win the tournament" odds (American), market consensus as of 24 Jun 2026 (FOX Sports / VegasInsider).
 // Teams not listed are deep longshots and fall back to their strength rating in market mode.
 const ODDS = {
@@ -425,7 +420,7 @@ function strength(team){
    STATE  (overrides)
    ============================================================ */
 let fxOverride = {};   // "A0" -> [homeGoals, awayGoals] manual scoreline
-let koOverride = {...KO_PLAYED};   // matchNo -> winning team name
+let koOverride = {};   // matchNo -> winning team name
 let flatMargins = true; // true = every projected win defaults to 1–0; false = margin scales with rating gap
 let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
 let hostBoost = false;  // adds a home-tournament strength bump for USA / Mexico / Canada
@@ -1051,7 +1046,7 @@ function closeModal(){ document.getElementById("modal").style.display="none"; }
 
 // Roll one probabilistic tournament and write it into the board as overrides (a plausible alternate reality)
 function randomFill(){
-  fxOverride={}; koOverride={...KO_PLAYED};
+  fxOverride={}; koOverride={};
   for(const g in GROUPS) FIXTURES[g].forEach(([h,a],i)=>{ fxOverride[g+i]=sampleScore(h,a); });
   const tables=computeGroups(), {assign}=bestThirds(tables), cache={};
   const ref=(o)=> o.w!==undefined?tables[o.w][0].name : o.ru!==undefined?tables[o.ru][1].name
@@ -1105,7 +1100,7 @@ document.getElementById("mc").onclick=()=>{
   setTimeout(()=>{ const res=runMonteCarlo(10000); mcGroups=res; render(); renderMC(res); btn.textContent="🎲 Run 10,000 simulations"; btn.disabled=false; }, 30);
 };
 
-document.getElementById("reset").onclick=()=>{ mcGroups=null; fxOverride={}; koOverride={...KO_PLAYED}; render(); };
+document.getElementById("reset").onclick=()=>{ mcGroups=null; fxOverride={}; koOverride={}; render(); };
 
 // --- saved scenarios (localStorage) ---
 function getScen(){ try{ return JSON.parse(localStorage.getItem("wc2026-scen")||"[]"); }catch(e){ return []; } }
@@ -1122,7 +1117,7 @@ function renderScenBar(){
   el.querySelectorAll("[data-load]").forEach(c=>c.onclick=(e)=>{
     if(e.target.dataset.del!==undefined){ const a2=getScen(); a2.splice(+e.target.dataset.del,1); setScen(a2); return; }
     const s=getScen()[+c.dataset.load];
-    fxOverride={};koOverride={...KO_PLAYED};flatMargins=true;oddsMode=false;hostBoost=false;mcGroups=null;
+    fxOverride={};koOverride={};flatMargins=true;oddsMode=false;hostBoost=false;mcGroups=null;
     location.hash = s.hash ? "#"+s.hash : ""; applyHash(); render();
   });
 }
@@ -1152,7 +1147,7 @@ function stateToHash(){
 function applyHash(){
   const h=location.hash.replace(/^#/,"");
   if(!h) return;
-  flatMargins=true; oddsMode=false; hostBoost=false; fxOverride={}; koOverride={...KO_PLAYED};
+  flatMargins=true; oddsMode=false; hostBoost=false; fxOverride={}; koOverride={};
   for(let tok of h.split("&")){
     try{ tok=decodeURIComponent(tok); }catch(e){}
     if(tok==="strength") flatMargins=false;
