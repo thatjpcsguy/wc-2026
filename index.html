@@ -220,9 +220,11 @@
     <div class="groups" id="groups"></div>
   </details>
 
-  <h2>Best Third‑Placed Teams — 8 of 12 qualify</h2>
-  <div class="hint" style="margin:-6px 0 10px">🔒 = confirmed 3rd-placed team (group finished) · <i>italic</i> = projected. Status shows <b style="color:var(--accent)">Qualified/Eliminated — locked</b> once a team is <i>mathematically</i> in or out of the top 8 (no scenario can change it); otherwise it's a projection.</div>
-  <div id="thirds"></div>
+  <details class="collapse" id="thirdsec">
+    <summary><span class="caret">▶</span><h2>Best Third‑Placed Teams — 8 of 12 qualify</h2><span class="shint">show / hide</span></summary>
+    <div class="hint" style="margin:0 0 10px">🔒 = confirmed 3rd-placed team (group finished) · <i>italic</i> = projected. Status shows <b style="color:var(--accent)">Qualified/Eliminated — locked</b> once a team is <i>mathematically</i> in or out of the top 8 (no scenario can change it); otherwise it's a projection.</div>
+    <div id="thirds"></div>
+  </details>
 
   <h2>Monte Carlo — title &amp; round probabilities</h2>
   <div id="mcout"><div class="hint">Runs thousands of randomised tournaments (real results kept fixed; remaining games by the expected‑goals model; knockouts by win probability) using the <b>currently selected favourite source</b>. Click <b>Run 10,000 simulations</b> above.</div></div>
