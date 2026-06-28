@@ -32,22 +32,56 @@ const GROUPS = "ABCDEFGHIJKL".split("");
 // Match the footballbox triple:  |team1={{#invoke:flag|fb-rt|XXX}} \n |score=... \n |team2={{#invoke:flag|fb|YYY}}
 const RX = /\|\s*team1\s*=\s*\{\{#invoke:flag\|fb-rt\|([A-Z]{3})\}\}\s*\n\|\s*score\s*=([^\n]*)\n\|\s*team2\s*=\s*\{\{#invoke:flag\|fb\|([A-Z]{3})\}\}/g;
 
-// Fetch the wikitext of all 12 group pages in ONE API call → { A: wikitext, ... }
-async function fetchAllGroups(){
-  const titles = GROUPS.map(g => `2026 FIFA World Cup Group ${g}`).join("|");
+const HEADERS = { "User-Agent": "wc2026-sim/1.0 (github.com/thatjpcsguy/wc-2026)" };
+
+async function fetchWikiPages(titles){
   const url = "https://en.wikipedia.org/w/api.php?action=query&prop=revisions" +
-    "&rvprop=content&rvslots=main&format=json&formatversion=2&titles=" + encodeURIComponent(titles);
-  const r = await fetch(url, { headers: { "User-Agent": "wc2026-sim/1.0 (github.com/thatjpcsguy/wc-2026)" } });
+    "&rvprop=content&rvslots=main&format=json&formatversion=2&titles=" + encodeURIComponent(titles.join("|"));
+  const r = await fetch(url, { headers: HEADERS });
   if (!r.ok) throw new Error(`Wikipedia API HTTP ${r.status}`);
-  const pages = (await r.json())?.query?.pages || [];
+  return (await r.json())?.query?.pages || [];
+}
+
+// Fetch the wikitext of all 12 group pages in ONE API call → { A: wikitext, ... }
+// Then resolve any {{#lst:PageTitle|label}} transclusions by fetching sub-pages.
+async function fetchAllGroups(){
+  const groupTitles = GROUPS.map(g => `2026 FIFA World Cup Group ${g}`);
+  const pages = await fetchWikiPages(groupTitles);
   const out = {};
   for (const p of pages){
-    const g = (p.title || "").trim().slice(-1);              // "…Group A" → "A"
+    const g = (p.title || "").trim().slice(-1);
     const content = p.revisions?.[0]?.slots?.main?.content;
     if (GROUPS.includes(g) && content) out[g] = content;
   }
   const missing = GROUPS.filter(g => !out[g]);
   if (missing.length) throw new Error("missing group pages: " + missing.join(","));
+
+  // Collect any {{#lst:PageTitle|label}} transclusions referenced in group pages
+  const LST_RX = /\{\{#lst:([^|]+)\|([^}]+)\}\}/g;
+  const subPageMap = {};   // title → [{ groupLetter, label }, ...]
+  for (const g of GROUPS){
+    let m;
+    while ((m = LST_RX.exec(out[g])) !== null){
+      const title = m[1].trim(), label = m[2].trim();
+      (subPageMap[title] ||= []).push({ g, label });
+    }
+  }
+
+  if (Object.keys(subPageMap).length){
+    const subPages = await fetchWikiPages(Object.keys(subPageMap));
+    for (const p of subPages){
+      const title = p.title || "";
+      const content = p.revisions?.[0]?.slots?.main?.content || "";
+      for (const { g, label } of (subPageMap[title] || [])){
+        // Extract the section between <section begin="label"/> and <section end="label"/>
+        const secRX = new RegExp(`<section begin=["']?${label}["']?\\s*/>([\\s\\S]*?)<section end=["']?${label}["']?\\s*/>`);
+        const sec = content.match(secRX);
+        if (sec) out[g] += "\n" + sec[1];
+        else console.warn(`⚠ section "${label}" not found in "${title}"`);
+      }
+    }
+  }
+
   return out;
 }
 
