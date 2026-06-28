@@ -173,6 +173,16 @@
   .slot .nm{display:flex;align-items:center;gap:7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .slot .rt{font-size:10px}
   .slot.empty{font-style:italic;color:#475068;cursor:default}
+  /* real, completed knockout result */
+  .tie.played{border-color:rgba(25,195,125,.5)}
+  .tie.played .slot{cursor:default}
+  .tie.played .slot:hover{background:inherit}
+  .tie.played .slot.win:hover{background:rgba(25,195,125,.13)}
+  .slot.lose .nm{opacity:.55}
+  .goals{font-size:13px;font-weight:700;color:#fff;min-width:14px;text-align:right}
+  .slot.lose .goals{color:var(--muted);font-weight:600}
+  .ftmk{font-size:8px;font-weight:700;color:var(--accent);margin-left:5px;letter-spacing:.5px}
+  .pens{font-size:9px;color:var(--gold);font-weight:600;margin-left:5px;font-style:normal}
   .flag{font-size:14px}
   .champ{margin-top:16px;text-align:center;background:linear-gradient(90deg,#241d04,#3a2f06);
     border:1px solid var(--gold);border-radius:12px;padding:18px}
@@ -354,6 +364,12 @@ const KO = {
  99:{a:{win:91},b:{win:92}},100:{a:{win:95},b:{win:96}},
  101:{a:{win:97},b:{win:98}},102:{a:{win:99},b:{win:100}},
  104:{a:{win:101},b:{win:102}}
+};
+// Real, completed knockout results. Keyed by match number:
+//   { g:{TeamName:goals,...}, w:"WinnerName", pens:"4–2"|null }
+// A played match locks both slots, shows the actual score, and forces the winner downstream.
+const KO_PLAYED = {
+ 73:{g:{"South Africa":0,"Canada":1}, w:"Canada", pens:null},   // R32, Jun 28 — Eustáquio 90'+2'
 };
 // Display order chosen so the bracket nests as a clean tree (each match sits directly
 // after the two it feeds from) — top half = matches feeding SF 101, bottom half = SF 102.
@@ -646,7 +662,8 @@ function buildResolver(tables, thirdAssign){
     if(memo[m]!==undefined) return memo[m];
     const M=KO[m]; const pa=ref(M.a), pb=ref(M.b);
     let w;
-    if(!pa&&!pb) w=null;
+    if(KO_PLAYED[m]) w=KO_PLAYED[m].w;                  // real result wins outright
+    else if(!pa&&!pb) w=null;
     else if(!pa) w=pb;
     else if(!pb) w=pa;
     else{
@@ -701,6 +718,7 @@ function simulateOnce(){
                 : o.th!==undefined?(assign[o.th]?gr[assign[o.th]].th:null) : win(o.win);
   function win(m){
     if(cache[m]!==undefined) return cache[m];
+    if(KO_PLAYED[m]) return cache[m]=KO_PLAYED[m].w;       // real result fixed in every sim
     const M=KO[m], pa=ref(M.a), pb=ref(M.b);
     let w=(!pa&&!pb)?null : !pa?pb : !pb?pa : (Math.random()<pWin(pa,pb)?pa:pb);
     return cache[m]=w;
@@ -845,6 +863,7 @@ function render(){
     if(o.w!==undefined){ const s=stat[tables[o.w][0].name]; return s.best===1 && s.worst===1; }
     if(o.ru!==undefined){ const s=stat[tables[o.ru][1].name]; return s.best===2 && s.worst===2; }
     if(o.th!==undefined) return allDone;
+    if(o.win!==undefined) return !!KO_PLAYED[o.win];   // fed by a completed knockout match
     return false;
   };
   let bh="";
@@ -853,9 +872,11 @@ function render(){
     for(const m of round.ms){
       const [pa,pb]=R.participants(m);
       const w=R.winner(m);
-      const la=refLocked(KO[m].a), lb=refLocked(KO[m].b);
-      col+=`<div class="tie ${champPath.has(m)?'path':''}"><div class="mno">Match ${m}</div>
-        ${slotHTML(m,pa,pb,w,la)}${slotHTML(m,pb,pa,w,lb)}</div>`;
+      const res=KO_PLAYED[m];                              // real, completed result (if any)
+      const la=res?true:refLocked(KO[m].a), lb=res?true:refLocked(KO[m].b);
+      const tag=res?`<span class="ftmk" title="Full-time result">FT${res.pens?" · pens":""}</span>`:"";
+      col+=`<div class="tie ${champPath.has(m)?'path':''} ${res?'played':''}"><div class="mno">Match ${m}${tag}</div>
+        ${slotHTML(m,pa,pb,w,la,res)}${slotHTML(m,pb,pa,w,lb,res)}</div>`;
     }
     col+="</div></div>"; bh+=col;
   }
@@ -878,11 +899,18 @@ function render(){
   attachEvents();
 }
 
-function slotHTML(m,team,opp,w,locked){
+function slotHTML(m,team,opp,w,locked,res){
   if(!team) return `<div class="slot empty"><span class="nm">— TBD —</span></div>`;
   const isW = team===w;
-  const wp = opp ? Math.round(pWin(team,opp)*100) : null;
   const lockMark = locked ? `<span class="lockmk" title="Confirmed — mathematically locked into this slot">🔒</span>` : "";
+  if(res){                                                   // real, completed match: show the actual score
+    const g = res.g[team];
+    const pens = res.pens && isW ? `<span class="pens" title="Won on penalties">(${res.pens} pens)</span>` : "";
+    return `<div class="slot ${isW?'win':'lose'}" data-ko="${m}" data-team="${team}">
+      <span class="nm">${lockMark}<span class="flag">${FLAG[team]||""}</span>${team}${pens}</span>
+      <span class="rgt"><span class="goals" title="Goals">${g}</span></span></div>`;
+  }
+  const wp = opp ? Math.round(pWin(team,opp)*100) : null;
   return `<div class="slot ${isW?'win':''} ${locked?'':'spec'}" data-ko="${m}" data-team="${team}">
     <span class="nm">${lockMark}<span class="flag">${FLAG[team]||""}</span>${team}</span>
     <span class="rgt">${wp!==null?`<span class="wp" title="Win probability for this tie">${wp}%</span>`:''}<span class="rt">${strength(team)}</span></span></div>`;
@@ -918,7 +946,8 @@ function attachEvents(){
     };
   });
   document.querySelectorAll("[data-ko]").forEach(el=>{
-    el.onclick=()=>{ mcGroups=null; koOverride[+el.dataset.ko]=el.dataset.team; render(); };
+    el.onclick=()=>{ if(KO_PLAYED[+el.dataset.ko]) return;   // real result — not editable
+      mcGroups=null; koOverride[+el.dataset.ko]=el.dataset.team; render(); };
   });
   document.querySelectorAll("tr[data-trow]").forEach(el=>{
     el.onclick=()=>openTeam(el.dataset.trow);
