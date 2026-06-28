@@ -198,7 +198,7 @@
 <body>
 <header>
   <h1>🏆 FIFA World Cup 2026 — <span class="em">Favourites Simulator</span></h1>
-  <div class="sub">Built from the real played scorelines as of 24 June 2026. Every remaining match is resolved by team strength — the favourite wins each tie. Click any match to override the result and watch the bracket recompute.</div>
+  <div class="sub">Built from the real played scorelines as of 28 June 2026. Every remaining match is resolved by team strength — the favourite wins each tie. Click any match to override the result and watch the bracket recompute.</div>
   <div class="controls">
     <button class="primary" id="reset">↺ Reset to favourites</button>
     <button id="mmode"></button>
@@ -1052,7 +1052,9 @@ function randomFill(){
   const ref=(o)=> o.w!==undefined?tables[o.w][0].name : o.ru!==undefined?tables[o.ru][1].name
               : o.th!==undefined?(assign[o.th]?tables[assign[o.th]][2].name:null) : win(o.win);
   function win(m){ if(cache[m]!==undefined)return cache[m]; const M=KO[m],pa=ref(M.a),pb=ref(M.b);
-    let w=(!pa&&!pb)?null:!pa?pb:!pb?pa:(Math.random()<pWin(pa,pb)?pa:pb);
+    let w=(!pa&&!pb)?null:!pa?pb:!pb?pa
+        : KO_PLAYED[m] ? KO_PLAYED[m].w                       // real result fixed even in a random fill
+        : (Math.random()<pWin(pa,pb)?pa:pb);
     cache[m]=w; if(pa&&pb&&w) koOverride[m]=w; return w; }
   for(let m=73;m<=104;m++) if(KO[m]) win(m);
   mcGroups=null; render();
