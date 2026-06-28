@@ -33,6 +33,18 @@
   h2{font-size:15px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
     margin:30px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
 
+  /* Collapsible section */
+  details.collapse{margin:30px 0 14px}
+  details.collapse>summary{list-style:none;cursor:pointer;border-bottom:1px solid var(--line);
+    padding-bottom:8px;display:flex;align-items:center;gap:8px}
+  details.collapse>summary::-webkit-details-marker{display:none}
+  details.collapse>summary>h2{margin:0;border:0;padding:0;flex:1}
+  details.collapse>summary .caret{font-size:12px;color:var(--muted);transition:transform .15s}
+  details.collapse[open]>summary .caret{transform:rotate(90deg)}
+  details.collapse>summary .shint{font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
+  details.collapse>summary:hover .shint{color:var(--accent)}
+  details.collapse>div{margin-top:14px}
+
   /* Summary */
   .summary{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px}
   .scard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:150px;flex:1}
@@ -203,8 +215,10 @@
   <h2>Tournament Outlook</h2>
   <div class="summary" id="summary"></div>
 
-  <h2>Group Stage — projected final tables</h2>
-  <div class="groups" id="groups"></div>
+  <details class="collapse" id="groupsec">
+    <summary><span class="caret">▶</span><h2>Group Stage — final tables</h2><span class="shint">show / hide</span></summary>
+    <div class="groups" id="groups"></div>
+  </details>
 
   <h2>Best Third‑Placed Teams — 8 of 12 qualify</h2>
   <div class="hint" style="margin:-6px 0 10px">🔒 = confirmed 3rd-placed team (group finished) · <i>italic</i> = projected. Status shows <b style="color:var(--accent)">Qualified/Eliminated — locked</b> once a team is <i>mathematically</i> in or out of the top 8 (no scenario can change it); otherwise it's a projection.</div>
