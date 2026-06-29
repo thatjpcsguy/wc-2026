@@ -639,6 +639,17 @@ function teamStatuses(){
   return info;
 }
 function eliminatedTeams(){ const s=teamStatuses(); const d=new Set(); for(const t in s) if(s[t].status==="out") d.add(t); return d; }
+// Teams still able to go further. During the group stage: anyone not group-eliminated. Once the groups
+// finish: the 32-team knockout field minus the losers of any completed knockout match (auto-shrinks as
+// real KO results come in). Used to drop dead teams from the Monte Carlo table.
+function aliveTeams(){
+  const allDone=Object.keys(GROUPS).every(g=>FIXTURES[g].length===0);
+  if(!allDone){ const dead=eliminatedTeams(), a=new Set(); for(const n in RATING) if(!dead.has(n)) a.add(n); return a; }
+  const tables=computeGroups(), {assign}=bestThirds(tables), R=buildResolver(tables,assign), alive=new Set();
+  for(let m=73;m<=88;m++) R.participants(m).forEach(t=>{ if(t) alive.add(t); });   // everyone who reached the R32
+  for(const m in KO_PLAYED){ const w=KO_PLAYED[m].w; R.participants(+m).forEach(t=>{ if(t&&t!==w) alive.delete(t); }); }
+  return alive;
+}
 
 const ORD=["","1st","2nd","3rd","4th"];
 // plain-English "what they need to do to advance"
@@ -1112,8 +1123,8 @@ function randomFill(){
 
 function renderMC(res){
   const {tally,N}=res;
-  const dead=eliminatedTeams();
-  const top=Object.keys(tally).filter(n=>!dead.has(n)).sort((a,b)=> tally[b].t-tally[a].t || tally[b].f-tally[a].f || tally[b].sf-tally[a].sf || tally[b].ko-tally[a].ko);
+  const alive=aliveTeams();
+  const top=Object.keys(tally).filter(n=>alive.has(n)).sort((a,b)=> tally[b].t-tally[a].t || tally[b].f-tally[a].f || tally[b].sf-tally[a].sf || tally[b].ko-tally[a].ko);
   const pct=c=>100*c/N;
   const maxT=Math.max(1,...top.map(n=>tally[n].t));
   let rows="";
