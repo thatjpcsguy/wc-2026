@@ -204,8 +204,6 @@
   <div class="controls">
     <button class="primary" id="reset">↺ Reset to favourites</button>
     <button id="mmode"></button>
-    <button id="omode"></button>
-    <button id="fmode"></button>
     <button id="hmode"></button>
     <button id="mc">🎲 Run 10,000 simulations</button>
     <button id="rand">🎲 Random tournament</button>
@@ -272,20 +270,20 @@ const FLAG = {
  England:"🏴󠁧󠁢󠁥󠁮󠁧󠁿",Croatia:"🇭🇷",Ghana:"🇬🇭",Panama:"🇵🇦"
 };
 
-// group -> [ [name, rating] ]  (rating ≈ FIFA-style strength; higher = favourite)
+// group -> [ [name, rating] ]  (rating = official FIFA/Coca-Cola World Ranking points, pulled 3 Jul 2026)
 const GROUPS = {
- A:[["Mexico",1655],["South Korea",1565],["Czechia",1500],["South Africa",1450]],
- B:[["Canada",1520],["Switzerland",1650],["Bosnia",1500],["Qatar",1440]],
- C:[["Brazil",1780],["Morocco",1710],["Scotland",1500],["Haiti",1290]],
- D:[["USA",1665],["Australia",1525],["Paraguay",1490],["Türkiye",1565]],
- E:[["Germany",1740],["Ivory Coast",1545],["Ecuador",1575],["Curaçao",1280]],
- F:[["Netherlands",1755],["Japan",1650],["Sweden",1560],["Tunisia",1485]],
- G:[["Belgium",1745],["Egypt",1510],["Iran",1630],["New Zealand",1300]],
- H:[["Spain",1875],["Uruguay",1680],["Cape Verde",1390],["Saudi Arabia",1455]],
- I:[["France",1865],["Norway",1600],["Senegal",1645],["Iraq",1390]],
- J:[["Argentina",1880],["Austria",1580],["Jordan",1390],["Algeria",1505]],
- K:[["Colombia",1690],["DR Congo",1470],["Portugal",1770],["Uzbekistan",1430]],
- L:[["England",1825],["Croatia",1705],["Ghana",1505],["Panama",1490]]
+ A:[["Mexico",1754],["South Korea",1559],["Czechia",1467],["South Africa",1451]],
+ B:[["Canada",1571],["Switzerland",1696],["Bosnia",1409],["Qatar",1411]],
+ C:[["Brazil",1805],["Morocco",1789],["Scotland",1491],["Haiti",1265]],
+ D:[["USA",1690],["Australia",1581],["Paraguay",1542],["Türkiye",1583]],
+ E:[["Germany",1726],["Ivory Coast",1565],["Ecuador",1593],["Curaçao",1286]],
+ F:[["Netherlands",1776],["Japan",1674],["Sweden",1526],["Tunisia",1427]],
+ G:[["Belgium",1757],["Egypt",1585],["Iran",1610],["New Zealand",1270]],
+ H:[["Spain",1892],["Uruguay",1635],["Cape Verde",1403],["Saudi Arabia",1426]],
+ I:[["France",1916],["Norway",1618],["Senegal",1653],["Iraq",1404]],
+ J:[["Argentina",1907],["Austria",1599],["Jordan",1350],["Algeria",1577]],
+ K:[["Colombia",1729],["DR Congo",1495],["Portugal",1788],["Uzbekistan",1410]],
+ L:[["England",1851],["Croatia",1723],["Ghana",1387],["Panama",1478]]
 };
 
 // Actual played results (real scorelines from the tournament, as of 23 Jun 2026): [home, homeGoals, awayGoals, away]
@@ -304,25 +302,6 @@ const PLAYED = {
  L:[["England",4,2,"Croatia"],["Ghana",1,0,"Panama"],["England",0,0,"Ghana"],["Panama",0,1,"Croatia"],["Panama",0,2,"England"],["Croatia",2,1,"Ghana"]]
 };
 
-// Outright "to win the tournament" odds (American), market consensus as of 24 Jun 2026 (FOX Sports / VegasInsider).
-// Teams not listed are deep longshots and fall back to their strength rating in market mode.
-const ODDS = {
- France:400, Spain:500, England:600, Argentina:650, Portugal:1000, Brazil:1200,
- Germany:1300, Netherlands:1600, Norway:3300, USA:3300, Morocco:3500, Japan:4000,
- Mexico:4500, Belgium:5000, Colombia:5000, Switzerland:8000
-};
-
-// Live per-match probabilities (home win / draw / away win, vig-removed) for upcoming group games where
-// bookmakers have posted them (DraftKings / market consensus, ~24 Jun 2026). Used only in MARKET mode; any
-// fixture not listed here — and every knockout tie — falls back to the outright-title-odds strength.
-// Keyed by "Home|Away" matching the FIXTURES order.
-const MATCH_ODDS = {
- "Norway|France":  {h:0.18, d:0.22, a:0.60},
- "Uruguay|Spain":  {h:0.14, d:0.23, a:0.63},
- "Türkiye|USA":    {h:0.28, d:0.24, a:0.48},
- "Japan|Sweden":   {h:0.47, d:0.26, a:0.27},
- "Egypt|Iran":     {h:0.39, d:0.35, a:0.26}
-};
 
 // Remaining (unplayed) group fixtures — auto-updated 2026-06-28 from Wikipedia.
 const FIXTURES = {
@@ -384,19 +363,7 @@ const KO_PLAYED = {
  82:{g:{"Belgium":3,"Senegal":2}, w:"Belgium", pens:null},     // R32, Jul 1 — Tielemans 124' pen; 3-2 AET
  84:{g:{"Spain":3,"Austria":0}, w:"Spain", pens:null},         // R32, Jul 2 — Oyarzabal brace, Pedro Porro
  83:{g:{"Portugal":2,"Croatia":1}, w:"Portugal", pens:null},   // R32, Jul 2 — Ronaldo pen, G.Ramos 90'+4'
-};
-// Per-tie betting market "to advance" probabilities for the Round of 32, vig-removed from FanDuel
-// moneylines (via FOX Sports, 28 Jun 2026). Keyed by match number → {team: P(advance)} (sums to 1).
-// Used ONLY in market mode; later rounds and any unlisted tie fall back to the strength model (pWin).
-const KO_ODDS = {
- 74:{"Germany":0.864,"Paraguay":0.136},      75:{"Netherlands":0.606,"Morocco":0.394},
- 76:{"Brazil":0.724,"Japan":0.276},          77:{"France":0.872,"Sweden":0.128},
- 78:{"Norway":0.630,"Ivory Coast":0.370},    79:{"Mexico":0.602,"Ecuador":0.398},
- 80:{"England":0.862,"DR Congo":0.138},      81:{"USA":0.846,"Bosnia":0.154},
- 82:{"Belgium":0.602,"Senegal":0.398},       83:{"Portugal":0.712,"Croatia":0.288},
- 84:{"Spain":0.879,"Austria":0.121},         85:{"Switzerland":0.667,"Algeria":0.333},
- 86:{"Argentina":0.936,"Cape Verde":0.064},  87:{"Colombia":0.788,"Ghana":0.212},
- 88:{"Egypt":0.555,"Australia":0.445}
+ 85:{g:{"Switzerland":2,"Algeria":0}, w:"Switzerland", pens:null}, // R32, Jul 2 — Swiss 3rd straight win
 };
 // Display order chosen so the bracket nests as a clean tree (each match sits directly
 // after the two it feeds from) — top half = matches feeding SF 101, bottom half = SF 102.
@@ -427,43 +394,11 @@ for(let i=0;i<THIRD_ALLOC_PACKED.length;i+=16) THIRD_ALLOC[THIRD_ALLOC_PACKED.sl
 const RATING={}, GRP={};
 for(const g in GROUPS) for(const [n,r] of GROUPS[g]){ RATING[n]=r; GRP[n]=g; }
 
-// Market rating: title odds → implied probability → a rating on the SAME scale as RATING
-// (calibrated so the shortest price lands near the top of the rating band). Unlisted teams reuse their rating.
-const MKT={};
-for(const n in RATING){
-  if(ODDS[n]){ const p=100/(ODDS[n]+100); MKT[n]=Math.round(2084+120*Math.log(p)); }
-  else MKT[n]=RATING[n];
-}
-// Form re-rating: a sequential Elo pass over the actual played group results, starting from the
-// pre-tournament RATING. World Football Elo convention — K=60 for World Cup finals, a goal-difference
-// multiplier G (1 / 1.5 / (11+GD)/8), and the expectation E on the SAME /350 logistic as pWin so it
-// stays internally consistent. Group stages are independent (teams only play inside their group), so a
-// per-group sequential update is exact. ELO_ADJ[t]-RATING[t] is the team's group-stage form delta.
-const ELO_ADJ={};
-(function(){
-  for(const n in RATING) ELO_ADJ[n]=RATING[n];
-  const K=60;
-  for(const g in PLAYED){
-    for(const [h,hg,ag,a] of PLAYED[g]){
-      if(ELO_ADJ[h]===undefined||ELO_ADJ[a]===undefined) continue;
-      const Eh=1/(1+Math.pow(10,(ELO_ADJ[a]-ELO_ADJ[h])/350));   // home win expectation
-      const Sh=hg>ag?1:hg<ag?0:0.5;
-      const gd=Math.abs(hg-ag), G=gd<=1?1:gd===2?1.5:(11+gd)/8;
-      const d=K*G*(Sh-Eh);
-      ELO_ADJ[h]+=d; ELO_ADJ[a]-=d;
-    }
-  }
-  for(const n in ELO_ADJ) ELO_ADJ[n]=Math.round(ELO_ADJ[n]);
-})();
-
-// active strength source — flips between subjective ratings and the betting market,
-// plus an optional home-tournament boost for the three host nations.
+// Team strength = official FIFA ranking points, with an optional home-tournament boost for the hosts.
 const HOSTS=new Set(["USA","Mexico","Canada"]);
 const HOST_BONUS=70;
 function strength(team){
-  // ratings mode: optionally use the group-form-adjusted Elo. market mode is the market's own view.
-  const base = oddsMode ? MKT[team] : (formMode ? ELO_ADJ[team] : RATING[team]);
-  return base + (hostBoost && HOSTS.has(team) ? HOST_BONUS : 0);
+  return RATING[team] + (hostBoost && HOSTS.has(team) ? HOST_BONUS : 0);
 }
 
 /* ============================================================
@@ -472,8 +407,6 @@ function strength(team){
 let fxOverride = {};   // "A0" -> [homeGoals, awayGoals] manual scoreline
 let koOverride = {};   // matchNo -> winning team name
 let flatMargins = true; // true = every projected win defaults to 1–0; false = margin scales with rating gap
-let oddsMode = false;   // false = my ratings decide the favourite; true = the betting market decides
-let formMode = false;   // ratings mode only: use group-form-adjusted Elo instead of pre-tournament ratings
 let hostBoost = false;  // adds a home-tournament strength bump for USA / Mexico / Canada
 let mcGroups = null;    // latest Monte Carlo results {tally,N}, shown as probabilities in the group tables
 let lastChamp = null;   // projected champion from the most recent render (used to name saved scenarios)
@@ -493,32 +426,17 @@ function lambdas(h,a){
 }
 // win probability for a single knockout match (logistic on the rating gap)
 function pWin(a,b){ return 1/(1+Math.pow(10,(strength(b)-strength(a))/350)); }
-// P(team advances past opp) for knockout match m — market mode uses the posted "to advance" odds
-// where available; everything else (later rounds, ratings mode) falls back to the strength model.
-function koProb(m,team,opp){
-  if(oddsMode && KO_ODDS[m] && KO_ODDS[m][team]!=null && KO_ODDS[m][opp]!=null) return KO_ODDS[m][team];
-  return pWin(team,opp);
-}
 // Poisson sampler (Knuth) — for the Monte Carlo mode
 function poisson(l){ const L=Math.exp(-l); let k=0,p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; }
 function sampleScore(h,a){ const [lh,la]=lambdas(h,a); return [poisson(lh),poisson(la)]; }
-// One sampled scoreline for a group fixture: market mode uses posted match odds (outcome from odds,
-// scoreline shape from the goal model); otherwise the strength-based Poisson model.
-function sampleFixture(h,a){
-  const o = oddsMode ? MATCH_ODDS[h+"|"+a] : null;
-  if(!o) return sampleScore(h,a);
-  const r=Math.random(), want = r<o.h ? 1 : r<o.h+o.d ? 0 : -1;   // 1 home win, 0 draw, -1 away win
-  for(let k=0;k<16;k++){ const [x,y]=sampleScore(h,a); const out=x>y?1:x<y?-1:0; if(out===want) return [x,y]; }
-  return want>0?[1,0] : want<0?[0,1] : [1,1];                     // fallback scoreline
-}
+// One sampled scoreline for a group fixture (strength-based Poisson model).
+function sampleFixture(h,a){ return sampleScore(h,a); }
 
 // Deterministic "most likely" scoreline for the default projection (favourite wins each tie).
 //  flatMargins → every win is a minimal 1–0; otherwise round the expected goals, with the
 //  favourite nudged to win if the rounding produced a draw.
 function strengthScore(h,a){
-  // favourite from live match odds (market mode, where posted) else from strength
-  const o = oddsMode ? MATCH_ODDS[h+"|"+a] : null;
-  const homeFav = o ? (o.h>=o.a) : (strength(h)>=strength(a));
+  const homeFav = strength(h)>=strength(a);
   if(flatMargins) return homeFav ? [1,0] : [0,1];
   const [lh,la]=lambdas(h,a);
   let gh=Math.round(lh), ga=Math.round(la);
@@ -736,7 +654,7 @@ function buildResolver(tables, thirdAssign){
     else if(!pb) w=pa;
     else{
       const ov=koOverride[m];
-      w = (ov===pa||ov===pb) ? ov : (koProb(m,pa,pb)>=0.5?pa:pb);   // market odds in market mode, else strength
+      w = (ov===pa||ov===pb) ? ov : (pWin(pa,pb)>=0.5?pa:pb);   // market odds in market mode, else strength
     }
     return memo[m]=w;
   }
@@ -788,7 +706,7 @@ function simulateOnce(){
     if(cache[m]!==undefined) return cache[m];
     if(KO_PLAYED[m]) return cache[m]=KO_PLAYED[m].w;       // real result fixed in every sim
     const M=KO[m], pa=ref(M.a), pb=ref(M.b);
-    let w=(!pa&&!pb)?null : !pa?pb : !pb?pa : (Math.random()<koProb(m,pa,pb)?pa:pb);
+    let w=(!pa&&!pb)?null : !pa?pb : !pb?pa : (Math.random()<pWin(pa,pb)?pa:pb);
     return cache[m]=w;
   }
   const ko32=[], winners=[];
@@ -835,15 +753,15 @@ function render(){
     const edits=Object.keys(fxOverride).length+Object.keys(koOverride).length;
     const basis = mcGroups&&champ ? `${(100*mcGroups.tally[champ].t/mcGroups.N).toFixed(0)}% across simulations`
       : edits>10 ? "from this scenario" : edits>0 ? "with your edits"
-      : oddsMode ? "market favourite wins out" : "favourite wins every tie";
+      : "favourite wins every tie";
     cards.push(`<div class="scard gold"><div class="lab">Projected champion</div><div class="val">${FLAG[champ]||""} ${champ||"—"}</div><div class="sub">${basis}</div></div>`);
     cards.push(`<div class="scard"><div class="lab">Other finalist</div><div class="val">${FLAG[other]||""} ${other||"—"}</div><div class="sub">loses the final to the champion</div></div>`);
     cards.push(`<div class="scard"><div class="lab">Qualified · alive · out</div><div class="val">${through} · ${contention} · ${out}</div><div class="sub">of 48 teams</div></div>`);
     if(mcGroups){
-      let best=null; for(const n in ODDS){ const e=100*mcGroups.tally[n].t/mcGroups.N - 100/(ODDS[n]+100); if(best===null||e>best.e) best={n,e}; }
-      if(best) cards.push(`<div class="scard"><div class="lab">Best value vs market</div><div class="val">${FLAG[best.n]||""} ${best.n}</div><div class="sub">model ${best.e>=0?"+":""}${best.e.toFixed(1)} pts vs the odds</div></div>`);
+      const top=Object.keys(mcGroups.tally).filter(n=>aliveTeams().has(n)).sort((a,b)=>mcGroups.tally[b].t-mcGroups.tally[a].t)[0];
+      if(top) cards.push(`<div class="scard"><div class="lab">Title favourite</div><div class="val">${FLAG[top]||""} ${top}</div><div class="sub">${(100*mcGroups.tally[top].t/mcGroups.N).toFixed(1)}% to win it all</div></div>`);
     } else {
-      cards.push(`<div class="scard"><div class="lab">Simulation</div><div class="val" style="font-size:13px;color:var(--muted);font-weight:600">Run 10,000× for odds &amp; value picks</div></div>`);
+      cards.push(`<div class="scard"><div class="lab">Simulation</div><div class="val" style="font-size:13px;color:var(--muted);font-weight:600">Run 10,000× for title odds</div></div>`);
     }
     document.getElementById("summary").innerHTML=cards.join("");
   }
@@ -871,7 +789,7 @@ function render(){
       else                           chip="";
       rows+=`<tr class="${advanced?'adv':''} ${isDead?'dead':''}" data-trow="${t.name}" title="Click for details">
         <td class="l"><span class="pos ${badge}">${posTxt[i]}</span>${FLAG[t.name]||""} <span class="tn">${t.name}</span>${t.h2h?'<span class="h2h" title="Tie broken by head-to-head result">H2H</span>':''}${chip}</td>
-        <td class="rt">${t.r}${formMode&&!oddsMode?(d=>`<span class="rdelta ${d>=0?'up':'dn'}" title="Group-form Elo change vs pre-tournament">${d>=0?'+':''}${d}</span>`)(ELO_ADJ[t.name]-RATING[t.name]):''}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
+        <td class="rt">${t.r}</td><td>${t.pts}</td><td>${t.gd>0?'+':''}${t.gd}</td>${mcCells}</tr>`;
     });
     let fx="";
     FIXTURES[g].forEach(([h,a],i)=>{
@@ -952,12 +870,6 @@ function render(){
 
   document.getElementById("mmode").textContent =
     flatMargins ? "⚽ Scores: all 1–0" : "⚽ Scores: by strength";
-  document.getElementById("omode").textContent =
-    oddsMode ? "📈 Favourite: betting market" : "📊 Favourite: my ratings";
-  const fb=document.getElementById("fmode");
-  fb.textContent = formMode ? "📈 Form: group results" : "📈 Form: pre-tournament";
-  fb.disabled = oddsMode;                               // form re-rates ratings, not the market view
-  fb.title = oddsMode ? "Switch Favourite back to ‘my ratings’ to use group form" : "Re-rate teams from their actual group results (Elo)";
   document.getElementById("hmode").textContent =
     hostBoost ? "🏟️ Host boost: on" : "🏟️ Host boost: off";
   history.replaceState(null, "", location.pathname + location.search + stateToHash());
@@ -982,7 +894,7 @@ function slotHTML(m,team,opp,w,locked,res){
       <span class="nm">${lockMark}<span class="flag">${FLAG[team]||""}</span>${team}${pens}</span>
       <span class="rgt"><span class="goals" title="Goals">${g}</span></span></div>`;
   }
-  const wp = opp ? Math.round(koProb(m,team,opp)*100) : null;
+  const wp = opp ? Math.round(pWin(team,opp)*100) : null;
   return `<div class="slot ${isW?'win':''} ${locked?'':'spec'}" data-ko="${m}" data-team="${team}">
     <span class="nm">${lockMark}<span class="flag">${FLAG[team]||""}</span>${team}</span>
     <span class="rgt">${wp!==null?`<span class="wp" title="Win probability for this tie">${wp}%</span>`:''}<span class="rt">${strength(team)}</span></span></div>`;
@@ -1103,7 +1015,7 @@ function openTeam(name){
   }
   document.getElementById("modalCard").innerHTML=
     `<div class="mtop"><div class="mtitle">${FLAG[name]||''} ${name}</div><button class="mx" id="mclose">✕</button></div>`+
-    `<div class="msub">Group ${st&&c.g} · strength ${strength(name)}${formMode&&!oddsMode?(d=>` <span class="rdelta ${d>=0?'up':'dn'}">(form ${d>=0?'+':''}${d})</span>`)(ELO_ADJ[name]-RATING[name]):''} · <span class="qc ${SL[1]}">${SL[0]}</span></div>`+
+    `<div class="msub">Group ${st&&c.g} · strength ${strength(name)} · <span class="qc ${SL[1]}">${SL[0]}</span></div>`+
     `<div class="msec"><div class="mh">After ${c.played} game${c.played!==1?'s':''}</div><div class="mstat">${c.pts} pts · ${c.w}W ${c.d}D ${c.l}L · GF ${c.gf} GA ${c.ga} · GD ${c.gd>0?'+':''}${c.gd}</div></div>`+
     `<div class="msec"><div class="mh">Results</div>${resHtml}</div>`+
     `<div class="msec"><div class="mh">Remaining</div>${remHtml}</div>`+
@@ -1126,7 +1038,7 @@ function randomFill(){
   function win(m){ if(cache[m]!==undefined)return cache[m]; const M=KO[m],pa=ref(M.a),pb=ref(M.b);
     let w=(!pa&&!pb)?null:!pa?pb:!pb?pa
         : KO_PLAYED[m] ? KO_PLAYED[m].w                       // real result fixed even in a random fill
-        : (Math.random()<koProb(m,pa,pb)?pa:pb);
+        : (Math.random()<pWin(pa,pb)?pa:pb);
     cache[m]=w; if(pa&&pb&&w) koOverride[m]=w; return w; }
   for(let m=73;m<=104;m++) if(KO[m]) win(m);
   mcGroups=null; render();
@@ -1140,29 +1052,20 @@ function renderMC(res){
   const maxT=Math.max(1,...top.map(n=>tally[n].t));
   let rows="";
   top.forEach((n,idx)=>{
-    const mkt = ODDS[n]!==undefined ? 100/(ODDS[n]+100) : null;
-    let edge="—";
-    if(mkt!==null){
-      const e = pct(tally[n].t) - 100*mkt;            // model title% minus market implied%
-      const col = e>=0 ? "var(--accent)" : "var(--red)";
-      edge = `<span style="color:${col}">${e>=0?'+':''}${e.toFixed(1)}</span>`;
-    }
     rows+=`<tr>
       <td class="rk">${idx+1}</td>
       <td class="l">${FLAG[n]||""} ${n}</td>
       <td class="l"><span class="pbar" style="width:${Math.max(2,Math.round(70*tally[n].t/maxT))}px"></span>${pct(tally[n].t).toFixed(1)}%</td>
       <td>${pct(tally[n].f).toFixed(1)}%</td>
       <td>${pct(tally[n].sf).toFixed(1)}%</td>
-      <td>${pct(tally[n].ko).toFixed(0)}%</td>
-      <td class="st">${mkt!==null?(100*mkt).toFixed(1)+'%':'—'}</td>
-      <td>${edge}</td></tr>`;
+      <td>${pct(tally[n].ko).toFixed(0)}%</td></tr>`;
   });
   const champ=top[0];
   document.getElementById("mcout").innerHTML=
-    `<div class="hint" style="margin-bottom:8px">${N.toLocaleString()} simulations · favourite source: <b>${oddsMode?'betting market':'my ratings'}</b> · remaining scores via the expected‑goals model. `+
-    `Most likely champion: <b style="color:var(--gold)">${FLAG[champ]||''} ${champ}</b> (${pct(tally[champ].t).toFixed(1)}%). “Mkt” = bookmakers' implied title chance; “Edge” = model − market (green = model rates them higher than the market).</div>`+
+    `<div class="hint" style="margin-bottom:8px">${N.toLocaleString()} simulations from the <b>FIFA ranking</b> model · remaining scores via the expected‑goals model. `+
+    `Most likely champion: <b style="color:var(--gold)">${FLAG[champ]||''} ${champ}</b> (${pct(tally[champ].t).toFixed(1)}%).</div>`+
     `<table class="thirds"><tr><th class="l">#</th><th class="l">Team</th><th class="l">Win title</th>`+
-    `<th>Final</th><th>Semi</th><th>Reach KO</th><th class="l">Mkt</th><th>Edge</th></tr>${rows}</table>`;
+    `<th>Final</th><th>Semi</th><th>Reach KO</th></tr>${rows}</table>`;
 }
 
 document.getElementById("rand").onclick=()=>randomFill();
@@ -1178,7 +1081,7 @@ document.getElementById("reset").onclick=()=>{ mcGroups=null; fxOverride={}; koO
 function getScen(){ try{ return JSON.parse(localStorage.getItem("wc2026-scen")||"[]"); }catch(e){ return []; } }
 function setScen(a){ try{ localStorage.setItem("wc2026-scen", JSON.stringify(a)); }catch(e){} renderScenBar(); }
 function scenName(){
-  const tags=[]; if(oddsMode)tags.push("market"); if(formMode)tags.push("form"); if(hostBoost)tags.push("host"); if(!flatMargins)tags.push("xG");
+  const tags=[]; if(hostBoost)tags.push("host"); if(!flatMargins)tags.push("xG");
   const edits=Object.keys(fxOverride).length+Object.keys(koOverride).length; if(edits)tags.push(edits+" edit"+(edits>1?"s":""));
   return (lastChamp||"Scenario") + (tags.length? " · "+tags.join(", ") : "");
 }
@@ -1189,14 +1092,12 @@ function renderScenBar(){
   el.querySelectorAll("[data-load]").forEach(c=>c.onclick=(e)=>{
     if(e.target.dataset.del!==undefined){ const a2=getScen(); a2.splice(+e.target.dataset.del,1); setScen(a2); return; }
     const s=getScen()[+c.dataset.load];
-    fxOverride={};koOverride={};flatMargins=true;oddsMode=false;formMode=false;hostBoost=false;mcGroups=null;
+    fxOverride={};koOverride={};flatMargins=true;hostBoost=false;mcGroups=null;
     location.hash = s.hash ? "#"+s.hash : ""; applyHash(); render();
   });
 }
 document.getElementById("save").onclick=()=>{ const a=getScen(); a.push({name:scenName(), hash:stateToHash().replace(/^#/,"")}); setScen(a); };
 document.getElementById("mmode").onclick=()=>{ mcGroups=null; flatMargins=!flatMargins; render(); };
-document.getElementById("omode").onclick=()=>{ mcGroups=null; oddsMode=!oddsMode; render(); };
-document.getElementById("fmode").onclick=()=>{ if(oddsMode) return; mcGroups=null; formMode=!formMode; render(); };
 document.getElementById("hmode").onclick=()=>{ mcGroups=null; hostBoost=!hostBoost; render(); };
 document.getElementById("share").onclick=()=>{
   const btn=document.getElementById("share");
@@ -1207,12 +1108,10 @@ document.getElementById("share").onclick=()=>{
 };
 
 // --- shareable state: encode modes + manual overrides into a readable URL hash ---
-// e.g.  #market&host&strength&A0=2-1&ko97=England
+// e.g.  #host&strength&A0=2-1&ko97=England
 function stateToHash(){
   const t=[];
   if(!flatMargins) t.push("strength");                 // default is flat 1–0
-  if(oddsMode) t.push("market");
-  if(formMode) t.push("form");
   if(hostBoost) t.push("host");
   for(const id in fxOverride){ const [h,a]=fxOverride[id]; t.push(`${id}=${h}-${a}`); }
   for(const m in koOverride){ t.push(`ko${m}=${koOverride[m].replace(/ /g,"_")}`); }
@@ -1221,12 +1120,10 @@ function stateToHash(){
 function applyHash(){
   const h=location.hash.replace(/^#/,"");
   if(!h) return;
-  flatMargins=true; oddsMode=false; formMode=false; hostBoost=false; fxOverride={}; koOverride={};
+  flatMargins=true; hostBoost=false; fxOverride={}; koOverride={};
   for(let tok of h.split("&")){
     try{ tok=decodeURIComponent(tok); }catch(e){}
     if(tok==="strength") flatMargins=false;
-    else if(tok==="market") oddsMode=true;
-    else if(tok==="form") formMode=true;
     else if(tok==="host") hostBoost=true;
     else{
       let m;
@@ -1240,14 +1137,13 @@ function openAbout(){
   document.getElementById("modalCard").innerHTML =
     `<div class="mtop"><div class="mtitle">How this works</div><button class="mx" id="mclose">✕</button></div>`+
     `<div class="msub">A live model of the rest of the 2026 World Cup — favourites projected, everything editable.</div>`+
-    `<div class="msec"><div class="mh">Data</div><div class="atxt">Group tables are built from the <b>real played scorelines</b> as of 24 Jun 2026. Most groups have one game left; <b>Groups K & L are a matchday behind</b>, so they have more.</div></div>`+
-    `<div class="msec"><div class="mh">Projection</div><div class="atxt">Every remaining group game and knockout tie is won by the <b>favourite</b> (higher strength). The <b>Scores</b> toggle sets the margin: <i>all 1–0</i>, or an <b>expected-goals</b> model (Poisson; ~2.6 goals/game; ≈1 goal of supremacy per 250 rating points) so underdogs can score.</div></div>`+
+    `<div class="msec"><div class="mh">Data</div><div class="atxt">Group tables are built from the <b>real played scorelines</b>, and completed knockout ties are locked to their <b>actual results</b> (with penalties where applicable). The rest is projected.</div></div>`+
+    `<div class="msec"><div class="mh">Ratings</div><div class="atxt">Team strength = the <b>official FIFA/Coca-Cola World Ranking points</b> (pulled 3 Jul 2026), refreshed as FIFA updates them. An optional <b>🏟️ Host boost</b> adds a home bump for USA / Mexico / Canada.</div></div>`+
+    `<div class="msec"><div class="mh">Projection</div><div class="atxt">Every remaining game is won by the <b>favourite</b> (higher FIFA points). The <b>Scores</b> toggle sets the margin: <i>all 1–0</i>, or an <b>expected-goals</b> model (Poisson; ~2.6 goals/game; ≈1 goal of supremacy per 250 rating points) so underdogs can score.</div></div>`+
     `<div class="msec"><div class="mh">Tiebreakers — 2026 rules</div><div class="atxt">Points → <b>head-to-head</b> (pts, GD, goals among tied teams) → overall GD → overall goals → rating. <b>Head-to-head comes first</b> — new for 2026. Places decided that way are tagged <span class="h2h">H2H</span>.</div></div>`+
     `<div class="msec"><div class="mh">Knockouts & 3rd places</div><div class="atxt">The official 2026 bracket (Round of 32 → Final). The <b>8 best third-placed teams</b> are ranked by points → GD → goals and slotted into the Round of 32 using <b>FIFA's official allocation table</b> (all 495 combinations).</div></div>`+
-    `<div class="msec"><div class="mh">Favourite source</div><div class="atxt">Toggle between my subjective <b>ratings</b> and the <b>betting market</b>. In market mode, each <b>Round of 32</b> tie uses the posted <b>"to advance" odds</b> (vig-removed) directly; later rounds fall back to <b>outright title odds</b> converted to a strength value.</div></div>`+
-    `<div class="msec"><div class="mh">Form (Elo)</div><div class="atxt"><b>📈 Form</b> re-rates every team from their <b>actual group results</b> with a World-Football-Elo pass (K=60, goal-difference weighted, expectation on the same logistic as the knockout win model) on top of the pre-tournament ratings. The Rtg column then shows the <b>form delta</b> (e.g. <span class="rdelta up">+60</span>). Applies in ratings mode; the market view is left as the market's own.</div></div>`+
-    `<div class="msec"><div class="mh">Simulations</div><div class="atxt"><b>Run 10,000×</b> replays the tournament with random results (goals from the model, knockouts by win probability) for each team's title & round odds, with a model-vs-market <b>edge</b> column. <b>Random tournament</b> rolls one outcome onto the board.</div></div>`+
-    `<div class="msec"><div class="mh">Make it yours</div><div class="atxt">Click a <b>team</b> for its scenario & path · click a fixture team for <b>+1</b> (right-click −1, the score for 0–0) · click a <b>knockout match</b> to flip it · <b>🔗 Copy link</b> and <b>💾 Save scenario</b> keep states · <b>🏟️ Host boost</b> for the hosts. Edit the <code>GROUPS</code> / <code>ODDS</code> objects to retune.</div></div>`;
+    `<div class="msec"><div class="mh">Simulations</div><div class="atxt"><b>Run 10,000×</b> replays the tournament with random results (goals from the model, knockouts by win probability) for each team's title & round odds. <b>Random tournament</b> rolls one outcome onto the board.</div></div>`+
+    `<div class="msec"><div class="mh">Make it yours</div><div class="atxt">Click a <b>team</b> for its scenario & path · click a fixture team for <b>+1</b> (right-click −1, the score for 0–0) · click a <b>knockout match</b> to flip it · <b>🔗 Copy link</b> and <b>💾 Save scenario</b> keep states · <b>🏟️ Host boost</b> for the hosts. Edit the <code>GROUPS</code> ratings to retune.</div></div>`;
   document.getElementById("modal").style.display="flex";
   document.getElementById("mclose").onclick=closeModal;
 }
